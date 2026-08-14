@@ -207,7 +207,7 @@ footer{
 #monthlyReportBody .report-table tr:hover td{background:#fafdfc}
 #monthlyReportBody .report-footer{background:#f2f8f5;border:1px solid #dceae4;border-radius:14px}
 @media(max-width:760px){#monthlyReportCharts .report-charts{grid-template-columns:1fr!important}#monthlyReportCharts .chart-card:nth-child(3){grid-column:auto}#monthlyReportBody .report-print{padding:12px}}
-@media print{#reports>.tabs,#reports>.sub,#reportBox>.toolbar,#reportBox>.grid,#monthlyReportCharts,#monthlyReportBody .report-footer{display:none!important}#monthlyReportBody .report-print{border:0;box-shadow:none;padding:0}}
+@media print{#reports>.tabs,#reports>.sub,#reportBox>.toolbar,#reportBox>.grid,#monthlyReportCharts,#monthlyReportBody .report-footer{display:none!important}#monthlyReportBody .report-print{border:0;box-shadow:none;padding:0}}\n.print-fallback{background:#fff!important;color:#17344b!important;padding:20px!important}.print-fallback table{width:100%;border-collapse:collapse}.print-fallback th,.print-fallback td{border:1px solid #ccd7df;padding:8px;text-align:left}.print-fallback th{background:#eef5fa}.print-mode .top,.print-mode nav,.print-mode .toolbar,.print-mode .tabs{display:none!important}.print-mode main{padding:0}.print-mode #monthlyReportBody{display:block!important}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-database-compat.js"></script></head>
 <body>
@@ -294,7 +294,7 @@ footer{
 
 <section id="notices" class="page"><h2>Announcements</h2><div class="toolbar"><button class="btn" onclick="openNotice()">+ Announcement</button></div><div id="noticeRows"></div></section>
 
-<section id="reports" class="page"><h2>Reports</h2><div class="tabs"><button class="sel" onclick="reportType('summary',this)">Summary</button><button onclick="reportType('monthly',this)">Monthly Paid / Not Paid</button><button onclick="reportType('fund',this)">All Fund</button><button onclick="reportType('accounts',this)">Accounts</button></div><div id="reportBox" class="card"></div><div class="toolbar"><button class="btn" onclick="window.print()">🖨️ Print / Save PDF</button><button class="btn light" onclick="backup()">💾 Backup</button><button class="btn light" onclick="document.getElementById('restore').click()">↩️ Restore</button><input id="restore" type="file" accept=".json" class="hidden" onchange="restore(this)"></div></section>
+<section id="reports" class="page"><h2>Reports</h2><div class="sub">Reports are generated from Firebase data and monthly report snapshots are saved to Firebase.</div><div class="tabs"><button class="sel" onclick="reportType('summary',this)">Summary</button><button onclick="reportType('monthly',this)">Monthly Paid / Not Paid</button><button onclick="reportType('fund',this)">All Fund</button><button onclick="reportType('accounts',this)">Accounts</button></div><div id="reportBox" class="card"></div><div class="toolbar"><button class="btn" onclick="window.print()">🖨️ Print / Save PDF</button><button class="btn light" onclick="backup()">💾 Backup</button><button class="btn light" onclick="document.getElementById('restore').click()">↩️ Restore</button><input id="restore" type="file" accept=".json" class="hidden" onchange="restore(this)"></div></section>
 
 <section id="settings" class="page"><h2>Settings</h2><div class="card"><h3>Organization</h3><div class="formgrid"><div class="field"><label>Name</label><input id="orgName" value="Bahadur Khail Welfare Community"></div><div class="field"><label>Tagline</label><input id="tagline" value="امید • یکجہتی • خدمت"></div></div><button class="btn" onclick="saveSettings()">Save Settings</button></div>
 <div class="card" style="margin-top:12px"><h3>Security</h3><p class="sub">Change the local admin PIN.</p><div class="field"><label>New PIN</label><input id="newPin" type="password" inputmode="numeric"></div><button class="btn" onclick="changePin()">Change PIN</button></div>
@@ -305,14 +305,14 @@ footer{
 <div id="modal" class="modal"><div class="modalbox"><div class="modalhead"><h3 id="mt">Add</h3><button class="x" onclick="closeModal()">✕</button></div><div id="mb"></div></div></div>
 
 <script>
-const K='bhwc_website_v3', defaultDB={members:[],fund:[],tx:[],notices:[],settings:{name:'Bahadur Khail Welfare Community',tag:'امید • یکجہتی • خدمت'},pin:'1234'};
+const K='bhwc_website_v3', defaultDB={members:[],fund:[],tx:[],notices:[],reports:[],settings:{name:'Bahadur Khail Welfare Community',tag:'امید • یکجہتی • خدمت'},pin:'1234'};
 let currentReportType='summary';
 let currentReportMonth=reportMonthValue();
 let old=null, stored=null;
 try{ old=JSON.parse(localStorage.getItem('bhwc_complete_v2')||'null'); }catch(e){ old=null; }
 try{ stored=JSON.parse(localStorage.getItem(K)||'null'); }catch(e){ stored=null; }
-let db=stored||{...defaultDB,members:old?.members||[],fund:old?.fund||[],tx:old?.tx||[],notices:old?.notices||[],settings:old?.settings||defaultDB.settings,pin:old?.pin||defaultDB.pin};
-window.BHWC={ready:false,root:null};
+let db=stored||{...defaultDB,members:old?.members||[],fund:old?.fund||[],tx:old?.tx||[],notices:old?.notices||[],reports:old?.reports||[],settings:old?.settings||defaultDB.settings,pin:old?.pin||defaultDB.pin};
+window.BHWC={ready:false,root:null,auth:null,user:null,readyPromise:Promise.resolve(),saveQueue:Promise.resolve(),lastError:null};
 try{
   const firebaseConfig={
     apiKey:"AIzaSyABjlhHEjHdNr6-xZfqlBFSjYXtLO0iE6U",
@@ -325,10 +325,15 @@ try{
     measurementId:"G-R8XYW0DXKD"
   };
   if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
-  const _auth=firebase.auth();
+  window.BHWC.auth=firebase.auth();
   window.BHWC.root=firebase.database().ref("appData");
-  _auth.signInAnonymously().then(function(){
-    window.BHWC.ready=true;
+
+  // Authenticate the website anonymously before touching Realtime Database.
+  // This works with Firebase Rules that allow authenticated clients and keeps
+  // the existing website PIN login unchanged.
+  window.BHWC.readyPromise=window.BHWC.auth.signInAnonymously().then(function(cred){
+    window.BHWC.user=cred&&cred.user?cred.user:null;
+    if(!window.BHWC.user) throw new Error("Firebase anonymous authentication failed.");
     return window.BHWC.root.once("value");
   }).then(function(snap){
     const remote=snap.val();
@@ -338,40 +343,91 @@ try{
         fund:Array.isArray(remote.fund)?remote.fund:(db.fund||[]),
         tx:Array.isArray(remote.tx)?remote.tx:(db.tx||[]),
         notices:Array.isArray(remote.notices)?remote.notices:(db.notices||[]),
+        reports:Array.isArray(remote.reports)?remote.reports:(db.reports||[]),
         settings:remote.settings||db.settings||{},
         pin:remote.pin||db.pin||"1234"
       };
       localStorage.setItem(K,JSON.stringify(db));
-      try{renderAll()}catch(e){console.error(e)}
+      try{renderAll()}catch(e){console.error("Initial render:",e)}
     }else{
-      return window.BHWC.root.set({
-        members:db.members||[],fund:db.fund||[],tx:db.tx||[],
-        notices:db.notices||[],settings:db.settings||{},pin:db.pin||"1234"
+      return window.BHWC.root.update({
+        members:db.members||[],
+        fund:db.fund||[],
+        tx:db.tx||[],
+        notices:db.notices||[],
+        reports:db.reports||[],
+        settings:db.settings||{},
+        pin:db.pin||"1234"
       });
     }
-  }).catch(function(e){console.error("Firebase sync:",e)});
-}catch(e){console.error("Firebase init:",e)}
-
-function save(){
-  localStorage.setItem(K,JSON.stringify(db));
-  renderAll();
-  if(window.BHWC&&window.BHWC.ready&&window.BHWC.root){
-    return window.BHWC.root.set({
-      members:Array.isArray(db.members)?db.members:[],
-      fund:Array.isArray(db.fund)?db.fund:[],
-      tx:Array.isArray(db.tx)?db.tx:[],
-      notices:Array.isArray(db.notices)?db.notices:[],
-      settings:db.settings||{},
-      pin:db.pin||"1234"
-    }).catch(function(e){console.error("Firebase save failed:",e);});
-  }
-  return Promise.resolve();
+  }).then(function(){
+    window.BHWC.ready=true;
+    return true;
+  }).catch(function(e){
+    window.BHWC.ready=false;
+    console.error("Firebase init/sync failed:",e);
+    throw e;
+  });
+}catch(e){
+  window.BHWC.readyPromise=Promise.reject(e);
+  console.error("Firebase init:",e);
 }
-function toast(message){let el=document.getElementById('bhwcToast');if(!el){el=document.createElement('div');el.id='bhwcToast';el.style.cssText='position:fixed;right:16px;bottom:16px;z-index:99999;background:#173b33;color:#fff;padding:11px 15px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);font:600 13px Arial;opacity:0;transform:translateY(8px);transition:.18s';document.body.appendChild(el)}el.textContent=message;el.style.opacity='1';el.style.transform='translateY(0)';clearTimeout(el._t);el._t=setTimeout(()=>{el.style.opacity='0';el.style.transform='translateY(8px)'},2200)}
+
+function toast(message,type){
+  const old=document.querySelector(".bhwc-toast");
+  if(old)old.remove();
+  const el=document.createElement("div");
+  el.className="bhwc-toast";
+  el.textContent=message;
+  el.style.cssText="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;padding:12px 18px;border-radius:12px;background:"+(type==="error"?"#b42318":"#0f7a5b")+";color:#fff;font:600 14px Arial,sans-serif;box-shadow:0 8px 25px rgba(0,0,0,.25);max-width:90%;text-align:center;";
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),2800);
+}
+
+function firebaseReadyWithTimeout(ms){
+  ms=Number(ms)||12000;
+  if(window.BHWC&&window.BHWC.ready)return Promise.resolve(true);
+  const p=(window.BHWC&&window.BHWC.readyPromise)||Promise.reject(new Error("Firebase is not initialized."));
+  return Promise.race([
+    p.then(()=>{if(!window.BHWC.ready)throw new Error("Firebase is not connected yet.");return true;}),
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error("Firebase connection timed out. Check Firebase Authentication (Anonymous) and Realtime Database Rules / internet connection.")),ms))
+  ]);
+}
+function cloudPayload(){return {
+  members:Array.isArray(db.members)?db.members:[],
+  fund:Array.isArray(db.fund)?db.fund:[],
+  tx:Array.isArray(db.tx)?db.tx:[],
+  notices:Array.isArray(db.notices)?db.notices:[],
+  reports:Array.isArray(db.reports)?db.reports:[],
+  settings:db.settings||{},
+  pin:db.pin||"1234"
+};}
+async function save(){
+  localStorage.setItem(K,JSON.stringify(db));
+  try{renderAll()}catch(e){console.error("Render after save:",e);}
+  if(!window.BHWC||!window.BHWC.root) throw new Error("Firebase is not initialized.");
+
+  window.BHWC.saveQueue=(window.BHWC.saveQueue||Promise.resolve()).then(async function(){
+    await firebaseReadyWithTimeout(12000);
+    await window.BHWC.root.update(cloudPayload());
+    return true;
+  }).catch(function(e){
+    window.BHWC.lastError=e;
+    console.error("Firebase save failed:",e);
+    throw e;
+  });
+
+  return window.BHWC.saveQueue;
+}
+
 function money(n){return 'Rs. '+Number(n||0).toLocaleString('en-PK')}
 function today(){return new Date().toISOString().slice(0,10)}
 function month(){return monthLabel(reportMonthValue())}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function firebaseStatus(){
+  if(window.BHWC&&window.BHWC.ready) return true;
+  return false;
+}
 function login(){
   const input=document.getElementById('pin');
   const err=document.getElementById('loginErr');
@@ -398,83 +454,115 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.p)
 function modal(title,body){document.getElementById('mt').textContent=title;document.getElementById('mb').innerHTML=body;document.getElementById('modal').classList.add('show')}
 function closeModal(){document.getElementById('modal').classList.remove('show')}
 function openMember(editId=null){let m=db.members.find(x=>x.id===editId)||{name:'',phone:'',fund:500,status:'Active'};modal(editId?'Edit Member':'Add Member',`<form onsubmit="memberSave(event,${editId||0})"><div class="formgrid"><div class="field"><label>Name</label><input name="name" value="${esc(m.name)}" required></div><div class="field"><label>Phone</label><input name="phone" value="${esc(m.phone)}"></div><div class="field"><label>Monthly Fund</label><input name="fund" type="number" min="0" value="${m.fund}" required></div><div class="field"><label>Status</label><select name="status"><option ${m.status==='Active'?'selected':''}>Active</option><option ${m.status==='Inactive'?'selected':''}>Inactive</option></select></div></div><button class="btn">Save</button></form>`)}
-function memberSave(e,id){
+async function memberSave(e,id){
   e.preventDefault();
   const form=e.target;
   if(form.dataset.saving==='1') return;
   form.dataset.saving='1';
   const btn=form.querySelector('button[type="submit"],button.btn');
   if(btn){btn.disabled=true;btn.textContent='Saving…';}
-  (async function(){
-    try{
-      const f=new FormData(form),name=String(f.get('name')||'').trim(),phone=String(f.get('phone')||'').trim(),fund=Math.max(0,Number(f.get('fund')||0)),status=f.get('status')||'Active';
-      if(!name)throw new Error('Member name is required.');
-      const o={name,phone,fund,status};
-      if(id){const existing=db.members.find(x=>Number(x.id)===Number(id));if(!existing)throw new Error('Member not found.');Object.assign(existing,o);}
-      else db.members.push({id:Date.now()+Math.floor(Math.random()*1000),...o});
-      await save();
-      if(btn){btn.textContent='Saved ✓';}
-      closeModal();
-      renderAll();
-      toast('Member saved successfully.');
-    }catch(err){
-      console.error('Member save:',err);
-      form.dataset.saving='0';
-      if(btn){btn.disabled=false;btn.textContent='Save';}
-      alert(err.message||'Could not save member.');
+  try{
+    const f=new FormData(form),name=String(f.get('name')||'').trim(),phone=String(f.get('phone')||'').trim(),fund=Math.max(0,Number(f.get('fund')||0)),status=f.get('status')||'Active';
+    if(!name) throw new Error('Member name is required.');
+    const o={name,phone,fund,status};
+    if(id){
+      const existing=db.members.find(x=>Number(x.id)===Number(id));
+      if(!existing) throw new Error('Member not found.');
+      Object.assign(existing,o);
+    }else{
+      db.members.push({id:Date.now()+Math.floor(Math.random()*1000),...o});
     }
-  })();
+    await save();
+    closeModal();
+    renderAll();
+    toast('Member saved successfully.');
+  }catch(err){
+    form.dataset.saving='0';
+    if(btn){btn.disabled=false;btn.textContent='Save';}
+    console.error('Member save failed:',err);
+    alert('Member could not be saved. '+(err.message||'Please try again.'));
+  }
 }
 async function delMember(id){
-  if(!confirm('Delete this member?'))return;
-  const backup=db.members.slice();
-  db.members=db.members.filter(x=>Number(x.id)!==Number(id));
+  if(!confirm('Delete this member?')) return;
+  const before=db.members.length;
+  db.members=db.members.filter(x=>x.id!==id);
+  if(db.members.length===before) return;
   try{
     await save();
+    renderAll();
     toast('Member deleted successfully.');
   }catch(err){
-    db.members=backup;
-    localStorage.setItem(K,JSON.stringify(db));
-    renderAll();
-    alert(err.message||'Could not delete member from cloud.');
+    alert('Member delete failed. '+(err.message||'Please try again.'));
   }
 }
 function openFund(memberId=null){if(!db.members.length)return alert('Add a member first.');modal('Record Monthly Fund',`<form onsubmit="fundSave(event)"><div class="field"><label>Member</label><select name="member">${db.members.filter(x=>x.status==='Active').map(m=>`<option value="${m.id}" ${String(m.id)===String(memberId||db.members.find(x=>x.status==='Active')?.id)?'selected':''}>${esc(m.name)} — ${money(m.fund)}</option>`).join('')}</select></div><div class="formgrid"><div class="field"><label>Month</label><select name="month">${monthOptions(month())}</select></div><div class="field"><label>Amount Paid</label><input name="amount" type="number" min="0" required></div><div class="field"><label>Date</label><input name="date" type="date" value="${today()}"></div></div><button class="btn">Save Payment</button></form>`)}
-function fundSave(e){
+async function fundSave(e){
   e.preventDefault();
   const form=e.target;
   if(form.dataset.saving==='1') return;
   form.dataset.saving='1';
-  const btn=form.querySelector('button[type="submit"],button.btn'); if(btn){btn.disabled=true;btn.textContent='Saving…';}
-  const f=new FormData(form), memberId=Number(f.get('member')), m=db.members.find(x=>Number(x.id)===memberId);
-  const amt=Math.max(0,Number(f.get('amount')||0)), date=f.get('date')||today(), selectedMonth=monthKey(f.get('month'))||monthKey(date);
-  if(!m){form.dataset.saving='0';if(btn){btn.disabled=false;btn.textContent='Save Payment';}return alert('Member not found.');}
-  if(!amt){form.dataset.saving='0';if(btn){btn.disabled=false;btn.textContent='Save Payment';}return alert('Amount must be greater than 0.');}
-  const duplicate=db.fund.some(x=>Number(x.memberId)===memberId && paymentMonthKey(x)===selectedMonth && x.date===date && Number(x.paid)===amt);
-  if(duplicate){
-    form.dataset.saving='0'; if(btn){btn.disabled=false;btn.textContent='Save Payment';}
-    closeModal(); return alert('This exact payment is already saved. Duplicate payment was prevented.');
+  const btn=form.querySelector('button[type="submit"],button.btn');
+  if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  try{
+    const f=new FormData(form), memberId=Number(f.get('member')), m=db.members.find(x=>Number(x.id)===memberId);
+    const amt=Math.max(0,Number(f.get('amount')||0)), date=f.get('date')||today(), selectedMonth=monthKey(f.get('month'))||monthKey(date);
+    if(!m) throw new Error('Member not found.');
+    if(!amt) throw new Error('Amount must be greater than 0.');
+    const duplicate=db.fund.some(x=>Number(x.memberId)===memberId && paymentMonthKey(x)===selectedMonth && x.date===date && Number(x.paid)===amt);
+    if(duplicate){
+      form.dataset.saving='0';
+      if(btn){btn.disabled=false;btn.textContent='Save Payment';}
+      closeModal();
+      return alert('This exact payment is already saved. Duplicate payment was prevented.');
+    }
+    const id=Date.now()+Math.floor(Math.random()*1000);
+    db.fund.push({id,memberId,memberName:m.name,month:selectedMonth,monthLabel:monthLabel(selectedMonth),expected:Number(m.fund||0),paid:amt,date});
+    db.tx.push({id:id+1,date,type:'Income',title:'Monthly Fund - '+m.name,memberId,amount:amt});
+    await save();
+    closeModal();
+    renderAll();
+    toast('Fund saved successfully.');
+  }catch(err){
+    form.dataset.saving='0';
+    if(btn){btn.disabled=false;btn.textContent='Save Payment';}
+    console.error('Fund save failed:',err);
+    alert('Fund could not be saved. '+(err.message||'Please try again.'));
   }
-  const id=Date.now()+Math.floor(Math.random()*1000);
-  db.fund.push({id,memberId,month:selectedMonth,monthLabel:monthLabel(selectedMonth),expected:Number(m.fund||0),paid:amt,date});
-  db.tx.push({id:id+1,date,type:'Income',title:'Monthly Fund - '+m.name,memberId,amount:amt});
-  localStorage.setItem(K,JSON.stringify(db));
-  closeModal(); renderAll();
-  toast('Payment saved successfully.');
 }
 function openExpense(){modal('Add Expense',`<form onsubmit="txSave(event,'Expense')"><div class="formgrid"><div class="field"><label>Title</label><input name="title" required></div><div class="field"><label>Amount</label><input name="amount" type="number" min="0" required></div><div class="field"><label>Date</label><input name="date" type="date" value="${today()}"></div><div class="field"><label>Category</label><input name="category" placeholder="Rent, Bill, Food..."></div></div><button class="btn">Save Expense</button></form>`)}
 function openIncome(){modal('Add Income',`<form onsubmit="txSave(event,'Income')"><div class="formgrid"><div class="field"><label>Title</label><input name="title" required></div><div class="field"><label>Amount</label><input name="amount" type="number" min="0" required></div><div class="field"><label>Date</label><input name="date" type="date" value="${today()}"></div><div class="field"><label>Category</label><input name="category"></div></div><button class="btn">Save Income</button></form>`)}
-function txSave(e,type){
+async function txSave(e,type){
   e.preventDefault();
   const form=e.target;if(form.dataset.saving==='1')return;form.dataset.saving='1';
   const btn=form.querySelector('button[type="submit"],button.btn');if(btn){btn.disabled=true;btn.textContent='Saving…';}
-  const f=new FormData(form),amount=Math.max(0,Number(f.get('amount')||0)),date=f.get('date')||today(),title=String(f.get('title')||'').trim();
-  if(!title||!amount){form.dataset.saving='0';if(btn){btn.disabled=false;btn.textContent='Save '+type;}return alert('Enter a title and amount greater than 0.');}
-  db.tx.push({id:Date.now()+Math.floor(Math.random()*1000),date,type,title,category:f.get('category'),amount});
-  save();closeModal();toast(type+' saved successfully.');
+  try{
+    const f=new FormData(form),amount=Math.max(0,Number(f.get('amount')||0)),date=f.get('date')||today(),title=String(f.get('title')||'').trim();
+    if(!title||!amount)throw new Error('Enter a title and amount greater than 0.');
+    db.tx.push({id:Date.now()+Math.floor(Math.random()*1000),date,type,title,category:f.get('category'),amount});
+    await save();
+    closeModal();toast(type+' saved successfully.');
+  }catch(err){
+    form.dataset.saving='0';if(btn){btn.disabled=false;btn.textContent='Save '+type;}
+    console.error(type+' save failed:',err);alert(type+' could not be saved. '+(err.message||'Please try again.'));
+  }
 }
 function openNotice(){modal('New Announcement',`<form onsubmit="noticeSave(event)"><div class="field"><label>Title</label><input name="title" required></div><div class="field"><label>Message</label><textarea name="body" rows="4" required></textarea></div><button class="btn">Publish</button></form>`)}
-function noticeSave(e){e.preventDefault();let f=new FormData(e.target);db.notices.push({id:Date.now(),title:f.get('title'),body:f.get('body'),date:today()});save();closeModal()}
+async function noticeSave(e){
+  e.preventDefault();
+  const form=e.target;if(form.dataset.saving==='1')return;form.dataset.saving='1';
+  const btn=form.querySelector('button[type="submit"],button.btn');if(btn){btn.disabled=true;btn.textContent='Publishing…';}
+  try{
+    const f=new FormData(form),title=String(f.get('title')||'').trim(),body=String(f.get('body')||'').trim();
+    if(!title||!body)throw new Error('Title and message are required.');
+    db.notices.push({id:Date.now()+Math.floor(Math.random()*1000),title,body,date:today()});
+    await save();
+    closeModal();toast('Announcement saved successfully.');
+  }catch(err){
+    form.dataset.saving='0';if(btn){btn.disabled=false;btn.textContent='Publish';}
+    console.error('Notice save failed:',err);alert('Announcement could not be saved. '+(err.message||'Please try again.'));
+  }
+}
 function setupDashCanvas(canvas){if(!canvas)return null;const rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1,w=Math.max(260,Math.floor(rect.width||300)),h=Number(canvas.getAttribute('height'))||205;canvas.width=Math.floor(w*dpr);canvas.height=Math.floor(h*dpr);const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);return{ctx,w,h};}
 function drawDashPaid(){const c=reportChartData(reportMonthValue()),z=setupDashCanvas(document.getElementById('dashPaidChart'));if(!z)return;const{ctx,w,h}=z,total=c.paidCount+c.notCount,cx=w/2,cy=h/2,r=Math.min(w,h)*.29;ctx.lineWidth=Math.max(22,r*.28);ctx.beginPath();ctx.strokeStyle='#edf2f0';ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();let a=-Math.PI/2;function seg(v,color){const e=a+(total?v/total:0)*Math.PI*2;ctx.beginPath();ctx.strokeStyle=color;ctx.arc(cx,cy,r,a,e);ctx.stroke();a=e;}seg(c.paidCount,'#18a36a');seg(c.notCount,'#ef5350');ctx.textAlign='center';ctx.fillStyle='#173b33';ctx.font='800 24px Arial';ctx.fillText(String(total),cx,cy+5);ctx.font='11px Arial';ctx.fillStyle='#71817b';ctx.fillText('Members',cx,cy+23);ctx.textAlign='left';ctx.font='700 11px Arial';ctx.fillStyle='#16834b';ctx.fillText('● Paid '+c.paidCount,12,18);ctx.fillStyle='#c74343';ctx.fillText('● Not Paid '+c.notCount,12,34);}
 function drawDashTrend(){const c=reportChartData(reportMonthValue()),z=setupDashCanvas(document.getElementById('dashTrendChart'));if(!z)return;const{ctx,w,h}=z,p={l:34,r:10,t:18,b:32},cw=w-p.l-p.r,ch=h-p.t-p.b,max=Math.max(1,...c.months.map(x=>x.amount));ctx.strokeStyle='#e5ece9';ctx.lineWidth=1;for(let i=0;i<4;i++){const y=p.t+ch*i/3;ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(w-p.r,y);ctx.stroke();}const pts=c.months.map((x,i)=>({x:p.l+cw*(i/(c.months.length-1||1)),y:h-p.b-(x.amount/max)*ch,v:x.amount,l:x.label}));ctx.strokeStyle='#148b6b';ctx.lineWidth=3;ctx.lineJoin='round';ctx.beginPath();pts.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));ctx.stroke();pts.forEach(pt=>{ctx.beginPath();ctx.fillStyle='#148b6b';ctx.arc(pt.x,pt.y,4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#173b33';ctx.font='10px Arial';ctx.textAlign='center';ctx.fillText(pt.l,pt.x,h-p.b+15);ctx.font='9px Arial';ctx.fillText(money(pt.v),pt.x,Math.max(4,pt.y-13));});}
@@ -499,16 +587,20 @@ function renderAccounts(){let i=sum('Income'),e=sum('Expense');document.getEleme
 function renderNotices(){document.getElementById('noticeRows').innerHTML=db.notices.length?db.notices.slice().reverse().map(n=>`<div class="notice"><b>${esc(n.title)}</b><small style="float:right;color:#7a8c99">${n.date}</small><p>${esc(n.body)}</p></div>`).join(''):'<div class="empty">No announcements.</div>'}
 function reportMonthValue(){
   const d=new Date();
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  return key<'2026-08'?'2026-08':(key>'2126-08'?'2126-08':key);
 }
 function monthOptions(selected){
-  const start=new Date(2026,7,1); // August 2026
-  const end=new Date(2126,7,1);   // August 2126 — 100 years ahead
-  const arr=[];
-  for(let d=new Date(start);d<=end;d.setMonth(d.getMonth()+1)){
-    const value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    const label=d.toLocaleString('en-US',{month:'long',year:'numeric'});
-    arr.push(`<option value="${value}" ${value===selected?'selected':''}>${label}</option>`);
+  const startYear=2026,startMonth=8,endYear=2126,endMonth=8;
+  let arr=[], selectedKey=monthKey(selected)||reportMonthValue();
+  for(let y=startYear;y<=endYear;y++){
+    const first=y===startYear?startMonth:1;
+    const last=y===endYear?endMonth:12;
+    for(let mo=first;mo<=last;mo++){
+      const value=y+'-'+String(mo).padStart(2,'0');
+      const label=new Date(y,mo-1,1).toLocaleString('en-US',{month:'long',year:'numeric'});
+      arr.push(`<option value="${value}" ${value===selectedKey?'selected':''}>${label}</option>`);
+    }
   }
   return arr.join('');
 }
@@ -545,29 +637,45 @@ function paymentMonthKey(x){
   return explicit;
 }
 function monthlyReport(monthValue){
-  const target=monthKey(monthValue);
-  const active=db.members.filter(m=>String(m.status||'Active').toLowerCase()==='active');
+  const target=monthKey(monthValue)||reportMonthValue();
+
+  // Monthly report must use the complete member list.
+  // Match payments by member ID first, then by normalized member name,
+  // and use both the stored month and payment date as the month key.
+  const members=Array.isArray(db.members)?db.members.filter(Boolean):[];
   const paidMap=new Map(),dateMap=new Map();
 
-  db.fund.filter(x=>paymentMonthKey(x)===target).forEach(x=>{
-    const rawId=String(x.memberId??'').trim();
-    const rawName=String(x.memberName??x.name??'').trim().toLowerCase();
-    let member=active.find(m=>String(m.id)===rawId);
-    if(!member && rawName) member=active.find(m=>String(m.name||'').trim().toLowerCase()===rawName);
+  function norm(v){return String(v??'').trim().replace(/\s+/g,' ').toLowerCase();}
+  function paymentTarget(x){
+    const keys=[x?.month,x?.monthLabel,x?.date];
+    for(const v of keys){
+      if(!v) continue;
+      const k=monthKey(v);
+      if(/^\d{4}-\d{2}$/.test(k)) return k;
+      if(/^\d{4}-\d{2}-\d{2}$/.test(String(v))) return String(v).slice(0,7);
+    }
+    return "";
+  }
+
+  db.fund.filter(x=>paymentTarget(x)===target).forEach(x=>{
+    const rawId=norm(x?.memberId);
+    const rawName=norm(x?.memberName??x?.name);
+    let member=members.find(m=>norm(m.id)===rawId);
+    if(!member && rawName) member=members.find(m=>norm(m.name)===rawName);
     if(!member) return;
 
     const key=String(member.id);
-    const amount=Number(x.paid??x.amount??0)||0;
+    const amount=Number(x?.paid??x?.amount??0)||0;
     paidMap.set(key,(paidMap.get(key)||0)+amount);
-    const d=String(x.date||'');
+    const d=String(x?.date||'');
     if(d>(dateMap.get(key)||'')) dateMap.set(key,d);
   });
 
-  const paid=active.filter(m=>(paidMap.get(String(m.id))||0)>0);
-  const not=active.filter(m=>(paidMap.get(String(m.id))||0)<=0);
-  const total=active.reduce((s,m)=>s+(paidMap.get(String(m.id))||0),0);
-  const expected=active.reduce((s,m)=>s+Number(m.fund||0),0);
-  return {active,paid,not,paidMap,dateMap,total,expected};
+  const paid=members.filter(m=>(paidMap.get(String(m.id))||0)>0);
+  const not=members.filter(m=>(paidMap.get(String(m.id))||0)<=0);
+  const total=members.reduce((s,m)=>s+(paidMap.get(String(m.id))||0),0);
+  const expected=members.reduce((s,m)=>s+Number(m.fund||0),0);
+  return {active:members,paid,not,paidMap,dateMap,total,expected};
 }
 
 function reportChartData(selected){
@@ -649,31 +757,144 @@ function drawReportCharts(selected){
   drawPaidNotPaidChart(selected);drawCollectionTrendChart(selected);drawExpectedCollectedChart(selected);
 }
 
+async function saveReportSnapshot(type, monthValue){
+  const target=monthKey(monthValue)||reportMonthValue();
+  let snapshot={id:type+'-'+target,type,month:target,monthLabel:monthLabel(target),generatedAt:new Date().toISOString()};
+
+  if(type==='monthly'){
+    const m=monthlyReport(target);
+    snapshot={
+      ...snapshot,
+      reportKind:'monthly-paid-not-paid',
+      totalMembers:m.active.length,
+      paidMembers:m.paid.length,
+      notPaidMembers:m.not.length,
+      totalCollected:m.total,
+      expected:m.expected,
+      remaining:Math.max(0,m.expected-m.total),
+      paid:m.paid.map(x=>({
+        memberId:x.id,
+        name:x.name,
+        monthlyFund:Number(x.fund||0),
+        paid:Number(m.paidMap.get(String(x.id))||0),
+        date:m.dateMap.get(String(x.id)||'')||''
+      })),
+      notPaid:m.not.map(x=>({
+        memberId:x.id,
+        name:x.name,
+        monthlyFund:Number(x.fund||0),
+        status:'Not Paid'
+      }))
+    };
+  }else if(type==='fund'){
+    snapshot.totalPayments=db.fund.length;
+    snapshot.totalCollected=db.fund.reduce((s,x)=>s+Number(x.paid||0),0);
+    snapshot.rows=db.fund.map(x=>({
+      id:x.id,memberId:x.memberId,
+      memberName:x.memberName||db.members.find(m=>String(m.id)===String(x.memberId))?.name||'Unknown',
+      month:paymentMonthKey(x),date:x.date||'',
+      expected:Number(x.expected||0),paid:Number(x.paid||0)
+    }));
+  }else if(type==='accounts'){
+    snapshot.income=sum('Income');
+    snapshot.expenses=sum('Expense');
+    snapshot.balance=snapshot.income-snapshot.expenses;
+    snapshot.rows=db.tx.map(x=>({...x}));
+  }else{
+    snapshot.totalMembers=db.members.length;
+    snapshot.totalFundCollected=db.fund.reduce((s,x)=>s+Number(x.paid||0),0);
+    snapshot.totalIncome=sum('Income');
+    snapshot.totalExpenses=sum('Expense');
+    snapshot.balance=snapshot.totalIncome-snapshot.totalExpenses;
+  }
+
+  if(!Array.isArray(db.reports)) db.reports=[];
+  const idx=db.reports.findIndex(x=>x.id===snapshot.id);
+  if(idx>=0) db.reports[idx]=snapshot; else db.reports.push(snapshot);
+  if(db.reports.length>500) db.reports=db.reports.slice(-500);
+  localStorage.setItem(K,JSON.stringify(db));
+
+  if(!window.BHWC||!window.BHWC.root) throw new Error("Firebase is not initialized.");
+  await firebaseReadyWithTimeout(12000);
+
+  window.BHWC.saveQueue=(window.BHWC.saveQueue||Promise.resolve()).then(async function(){
+    const payload={reports:Array.isArray(db.reports)?db.reports:[]};
+    if(type==='monthly'){
+      payload.monthlyReports={};
+      payload.monthlyReports[target]=snapshot;
+    }
+    await window.BHWC.root.update(payload);
+    return true;
+  }).catch(function(e){
+    window.BHWC.lastError=e;
+    console.error("Report cloud save failed:",e);
+    throw e;
+  });
+
+  await window.BHWC.saveQueue;
+  return true;
+}
 function renderMonthlyReport(){
-  const input=document.getElementById('reportMonth'),body=document.getElementById('monthlyReportBody');
+  const input=document.getElementById('reportMonth');
+  const body=document.getElementById('monthlyReportBody');
   if(!input||!body)return;
-  const selected=input.value||reportMonthValue(),displayMonth=monthLabel(selected),m=monthlyReport(selected);
-  document.getElementById('rMemberCount').textContent=m.active.length;document.getElementById('rPaidCount').textContent=m.paid.length;
-  document.getElementById('rNotCount').textContent=m.not.length;
-  document.getElementById('rTotalPaid').textContent=money(m.total);
-  document.getElementById('rExpected').textContent=money(m.expected);
-  document.getElementById('rBalanceExpected').textContent=money(Math.max(0,m.expected-m.total));
-  const charts=document.getElementById('monthlyReportCharts'); if(charts) charts.innerHTML=reportChartsHTML(selected);
-  drawReportCharts(selected);
+
+  const selected=monthKey(input.value)||reportMonthValue();
+  const displayMonth=monthLabel(selected);
+  currentReportMonth=selected;
+  const m=monthlyReport(selected);
+
+  // Update the four visible monthly report counters.
+  const memberEl=document.getElementById('rMemberCount');
+  const paidEl=document.getElementById('rPaidCount');
+  const notEl=document.getElementById('rNotCount');
+  const totalPaidEl=document.getElementById('rTotalPaid');
+  if(memberEl) memberEl.textContent=String(m.active.length);
+  if(paidEl) paidEl.textContent=String(m.paid.length);
+  if(notEl) notEl.textContent=String(m.not.length);
+  if(totalPaidEl) totalPaidEl.textContent=money(m.total);
+
+  // Optional counters: keep this safe even if these cards are not in the HTML.
+  const expectedEl=document.getElementById('rExpected');
+  const balanceExpectedEl=document.getElementById('rBalanceExpected');
+  if(expectedEl) expectedEl.textContent=money(m.expected);
+  if(balanceExpectedEl) balanceExpectedEl.textContent=money(Math.max(0,m.expected-m.total));
+
+  const charts=document.getElementById('monthlyReportCharts');
+  if(charts){
+    charts.innerHTML=reportChartsHTML(selected);
+    try{drawReportCharts(selected);}catch(err){console.error('Report charts:',err);}
+  }
+
+  const paidRows=m.paid.map((x,i)=>{
+    const amount=Number(m.paidMap.get(String(x.id))||0);
+    const partial=amount<Number(x.fund||0);
+    return `<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td><b>${money(amount)}</b>${partial?' <span class="pill pending">Partial</span>':''}</td><td>${esc(m.dateMap.get(String(x.id))||'—')}</td></tr>`;
+  }).join('') || '<tr><td colspan="5" class="empty">No paid members this month.</td></tr>';
+
+  const notRows=m.not.map((x,i)=>
+    `<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td><span class="pill bad">Not Paid</span></td></tr>`
+  ).join('') || '<tr><td colspan="4" class="empty">Everyone has paid this month.</td></tr>';
+
   body.innerHTML=`<div class="report-print">
-    <div class="print-report-header"><h2>Bahadur Khail Welfare Community</h2><h3>Monthly Fund Report — ${esc(displayMonth)}</h3><p>Report Month: <b>${esc(displayMonth)}</b></p></div>
+    <div class="print-report-header">
+      <h2>Bahadur Khail Welfare Community</h2>
+      <h3>Monthly Fund Report — ${esc(displayMonth)}</h3>
+      <p>Report Month: <b>${esc(displayMonth)}</b></p>
+    </div>
     <h3>✅ Paid Members (${m.paid.length})</h3>
-    <table class="report-table"><thead><tr><th>#</th><th>Member Name</th><th>Monthly Fund</th><th>Paid</th><th>Payment Date</th></tr></thead><tbody>
-    ${m.paid.length?m.paid.map((x,i)=>{const amount=m.paidMap.get(String(x.id))||0;const partial=amount<Number(x.fund||0);return `<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td><b>${money(amount)}</b>${partial?' <span class="pill pending">Partial</span>':''}</td><td>${esc(m.dateMap.get(String(x.id))||'—')}</td></tr>`}).join(''):'<tr><td colspan="5" class="empty">No paid members this month.</td></tr>'}
-    </tbody></table>
+    <table class="report-table"><thead><tr><th>#</th><th>Member Name</th><th>Monthly Fund</th><th>Paid</th><th>Payment Date</th></tr></thead><tbody>${paidRows}</tbody></table>
     <h3 style="margin-top:20px">❌ Not Paid Members (${m.not.length})</h3>
-    <table class="report-table"><thead><tr><th>#</th><th>Member Name</th><th>Monthly Fund</th><th>Status</th></tr></thead><tbody>
-    ${m.not.length?m.not.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td><span class="pill bad">Not Paid</span></td></tr>`).join(''):'<tr><td colspan="4" class="empty">Everyone has paid this month.</td></tr>'}
-    </tbody></table>
+    <table class="report-table"><thead><tr><th>#</th><th>Member Name</th><th>Monthly Fund</th><th>Status</th></tr></thead><tbody>${notRows}</tbody></table>
     <div class="report-footer"><b>Report Month:</b> ${esc(displayMonth)} &nbsp; | &nbsp; <b>Total Members:</b> ${m.active.length} &nbsp; | &nbsp; <b>Paid:</b> ${m.paid.length} &nbsp; | &nbsp; <b>Not Paid:</b> ${m.not.length} &nbsp; | &nbsp; <b>Total Collected:</b> ${money(m.total)} &nbsp; | &nbsp; <b>Remaining Expected:</b> ${money(Math.max(0,m.expected-m.total))}</div>
   </div>`;
-}
 
+  // Save this exact monthly paid/not-paid snapshot to Firebase.
+  saveReportSnapshot('monthly',selected).catch(err=>{
+    console.error('Monthly report save failed:',err);
+    toast('Monthly report cloud save failed: '+(err.message||'Please check Firebase.'),'error');
+  });
+}
 
 function reportType(type,btn){
   currentReportType=type;
@@ -683,7 +904,7 @@ function reportType(type,btn){
   const box=document.getElementById('reportBox');
   if(!box)return;
   if(type==='monthly'){
-    box.innerHTML=`<div class="toolbar" style="margin-top:0"><label style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px"><b>Report Month</b><select id="reportMonth" onchange="currentReportMonth=this.value;renderMonthlyReport()" style="padding:11px;border:1px solid var(--line);border-radius:12px;flex:1">${monthOptions(currentReportMonth||reportMonthValue())}</select></label><button class="btn" style="background:#0f7a5b" onclick="printMonthlyReport()">🖨️ Print Monthly Report</button></div>
+    box.innerHTML=`<div class="toolbar" style="margin-top:0"><label style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px"><b>Report Month</b><select id="reportMonth" onchange="currentReportMonth=this.value;renderMonthlyReport()" style="padding:11px;border:1px solid var(--line);border-radius:12px;flex:1">${monthOptions(currentReportMonth||reportMonthValue())}</select></label><button class="btn" style="background:#0f7a5b" onclick="saveReportSnapshot('monthly',document.getElementById('reportMonth')?.value||reportMonthValue()).then(()=>toast('Monthly Paid / Not Paid report saved to Firebase.')).catch(e=>toast('Report save failed: '+(e.message||'Please check Firebase.'),'error'))">☁️ Save Report</button><button class="btn" style="background:#0f7a5b" onclick="printMonthlyReport()">🖨️ Print Monthly Report</button></div>
     <div class="grid" style="margin-top:10px"><div class="card metric"><div class="lab">Total Members</div><div class="val" id="rMemberCount">0</div></div><div class="card metric"><div class="lab">Paid</div><div class="val" id="rPaidCount">0</div></div><div class="card metric"><div class="lab">Not Paid</div><div class="val" id="rNotCount">0</div></div><div class="card metric"><div class="lab">Total Collected</div><div class="val" id="rTotalPaid">Rs. 0</div></div></div>
     <div id="monthlyReportCharts"></div><div id="monthlyReportBody" style="margin-top:14px"></div>`;
     renderMonthlyReport();
@@ -697,22 +918,51 @@ function reportType(type,btn){
     const paid=db.fund.reduce((a,x)=>a+Number(x.paid||0),0),i=sum('Income'),e=sum('Expense');
     box.innerHTML=`<h3>Overall Summary</h3><p>Total members: <b>${db.members.length}</b></p><p>Total fund collected: <b>${money(paid)}</b></p><p>Total income: <b>${money(i)}</b></p><p>Total expenses: <b>${money(e)}</b></p><h2>Balance: ${money(i-e)}</h2>`;
   }
+  saveReportSnapshot(type,currentReportMonth||reportMonthValue()).catch(err=>{console.error('Report save failed:',err);toast('Report cloud save failed: '+(err.message||'Please check Firebase.'),'error');});
 }
 function printMonthlyReport(){
   const monthValue=document.getElementById('reportMonth')?.value||reportMonthValue();
   const m=monthlyReport(monthValue), label=monthLabel(monthValue);
   const rowsPaid=m.paid.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td>${money(m.paidMap.get(String(x.id))||0)}</td><td>${esc(m.dateMap.get(String(x.id))||'—')}</td></tr>`).join('')||'<tr><td colspan="5">No paid members.</td></tr>';
   const rowsNot=m.not.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td>Not Paid</td></tr>`).join('')||'<tr><td colspan="4">Everyone has paid.</td></tr>';
+
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Monthly Fund Report - ${esc(label)}</title>
+  <style>body{font-family:Arial,sans-serif;padding:28px;color:#17344b}h1{font-size:22px;margin:0 0 5px}h2{font-size:18px;margin-top:26px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccd7df;padding:8px;text-align:left}th{background:#eef5fa}.summary{padding:12px;background:#f5f9fc;border:1px solid #dbe6ee;margin:15px 0}@media print{body{padding:0}}</style>
+  </head><body><h1>Bahadur Khail Welfare Community</h1><h2>Monthly Fund Report — ${esc(label)}</h2>
+  <div class="summary"><b>Report Month:</b> ${esc(label)} &nbsp; | &nbsp; <b>Total Members:</b> ${m.active.length} &nbsp; | &nbsp; <b>Paid:</b> ${m.paid.length} &nbsp; | &nbsp; <b>Not Paid:</b> ${m.not.length} &nbsp; | &nbsp; <b>Total Collected:</b> ${money(m.total)} &nbsp; | &nbsp; <b>Remaining:</b> ${money(Math.max(0,m.expected-m.total))}</div>
+  <h2>Paid Members (${m.paid.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Paid</th><th>Payment Date</th></tr></thead><tbody>${rowsPaid}</tbody></table>
+  <h2>Not Paid Members (${m.not.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Status</th></tr></thead><tbody>${rowsNot}</tbody></table></body></html>`;
+
   const w=window.open('','_blank');
-  if(!w)return alert('Please allow pop-ups to print the report.');
-  w.document.write(`<!doctype html><html><head><title>Monthly Fund Report - ${esc(label)}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#17344b}h1{font-size:22px;margin:0 0 5px}h2{font-size:18px;margin-top:26px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccd7df;padding:8px;text-align:left}th{background:#eef5fa}.summary{padding:12px;background:#f5f9fc;border:1px solid #dbe6ee;margin:15px 0}@media print{body{padding:0}}</style></head><body><h1>Bahadur Khail Welfare Community</h1><h2>Monthly Fund Report — ${esc(label)}</h2><div class="summary"><b>Report Month:</b> ${esc(label)} &nbsp; | &nbsp; <b>Total Members:</b> ${m.active.length} &nbsp; | &nbsp; <b>Paid:</b> ${m.paid.length} &nbsp; | &nbsp; <b>Not Paid:</b> ${m.not.length} &nbsp; | &nbsp; <b>Total Collected:</b> ${money(m.total)}</div><h2>Paid Members (${m.paid.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Paid</th><th>Payment Date</th></tr></thead><tbody>${rowsPaid}</tbody></table><h2>Not Paid Members (${m.not.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Status</th></tr></thead><tbody>${rowsNot}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`);
-  w.document.close();
+  if(w){
+    w.document.open(); w.document.write(html); w.document.close();
+    setTimeout(()=>{try{w.focus();w.print();}catch(e){console.error('Popup print:',e);}},350);
+    return;
+  }
+
+  // Android WebView fallback: temporarily render the report in the current page.
+  const root=document.getElementById('monthlyReportBody');
+  if(!root)return alert('Unable to open the print view.');
+  const oldHtml=root.innerHTML, oldClass=root.className;
+  root.className='print-fallback';
+  const cleanHtml=html
+    .replace(/<html>/gi,'')
+    .replace(/<\/html>/gi,'')
+    .replace(/<head>[\s\S]*?<\/head>/gi,'')
+    .replace(/<body>/gi,'')
+    .replace(/<\/body>/gi,'');
+  root.innerHTML=cleanHtml;
+  document.body.classList.add('print-mode');
+  setTimeout(()=>{
+    try{window.print();}catch(e){alert('Print is not available in this Android WebView.');}
+    setTimeout(()=>{root.innerHTML=oldHtml;root.className=oldClass;document.body.classList.remove('print-mode');},500);
+  },150);
 }
 function backup(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Bahadur_Khail_Welfare_Backup.json';a.click()}
-function restore(inp){let f=inp.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let x=JSON.parse(r.result);if(!x.members||!x.fund||!x.tx)throw 0;db=x;save();alert('Backup restored.')}catch{alert('Invalid backup file.')}};r.readAsText(f)}
-function saveSettings(){db.settings.name=document.getElementById('orgName').value;db.settings.tag=document.getElementById('tagline').value;document.querySelectorAll('.brand h1').forEach(x=>x.textContent=db.settings.name);document.querySelectorAll('.brand small').forEach(x=>x.textContent=db.settings.tag);save();alert('Settings saved')}
-function changePin(){let p=document.getElementById('newPin').value;if(!/^[0-9]{4,8}$/.test(p))return alert('PIN must be 4–8 digits.');db.pin=p;save();document.getElementById('newPin').value='';alert('PIN changed.')}
-function clearData(){if(confirm('This will permanently remove all local records. Continue?')){db={...defaultDB,pin:db.pin,settings:db.settings};save();alert('All records cleared.')}}
+function restore(inp){let f=inp.files[0];if(!f)return;let r=new FileReader();r.onload=async()=>{try{let x=JSON.parse(r.result);if(!x.members||!x.fund||!x.tx)throw 0;db={...defaultDB,...x,members:Array.isArray(x.members)?x.members:[],fund:Array.isArray(x.fund)?x.fund:[],tx:Array.isArray(x.tx)?x.tx:[],notices:Array.isArray(x.notices)?x.notices:[],reports:Array.isArray(x.reports)?x.reports:[],settings:x.settings||defaultDB.settings,pin:x.pin||defaultDB.pin};await save();alert('Backup restored and saved to Firebase.')}catch(err){console.error('Restore:',err);alert(err?.message||'Invalid backup file.')}};r.readAsText(f)}
+function saveSettings(){db.settings.name=document.getElementById('orgName').value;db.settings.tag=document.getElementById('tagline').value;document.querySelectorAll('.brand h1').forEach(x=>x.textContent=db.settings.name);document.querySelectorAll('.brand small').forEach(x=>x.textContent=db.settings.tag);save().then(()=>alert('Settings saved successfully to Firebase.')).catch(err=>alert('Settings cloud save failed: '+(err.message||'Please try again.')))}
+function changePin(){let p=document.getElementById('newPin').value;if(!/^[0-9]{4,8}$/.test(p))return alert('PIN must be 4–8 digits.');db.pin=p;save().then(()=>{document.getElementById('newPin').value='';alert('PIN changed and saved to Firebase.')}).catch(err=>alert('PIN cloud save failed: '+(err.message||'Please try again.')))}
+async function clearData(){if(!confirm('This will permanently remove all local records. Continue?'))return;const backupState=db;db={...defaultDB,pin:backupState.pin,settings:backupState.settings};try{await save();alert('All records cleared from Firebase.')}catch(err){db=backupState;localStorage.setItem(K,JSON.stringify(db));renderAll();alert('Cloud clear failed: '+(err.message||'Please try again.'))}}
 function renderAll(){
   const keepType=currentReportType||'summary';
   const keepMonth=currentReportMonth||reportMonthValue();
