@@ -49,7 +49,131 @@ jobs:
       - name: Add Android
         run: npx cap add android
 
-      - name: Sync Android
+      - name: Create Native Print Plugin
+        run: |
+          mkdir -p android/app/src/main/java/com/bahadurkhail/welfare
+
+          cat > android/app/src/main/java/com/bahadurkhail/welfare/NativePrintPlugin.java <<'EOF'
+          package com.bahadurkhail.welfare;
+
+          import android.content.Context;
+          import android.print.PrintAttributes;
+          import android.print.PrintManager;
+          import android.webkit.WebView;
+
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+
+          @CapacitorPlugin(name = "NativePrint")
+          public class NativePrintPlugin extends Plugin {
+
+              @PluginMethod
+              public void print(PluginCall call) {
+
+                  getActivity().runOnUiThread(() -> {
+
+                      try {
+
+                          WebView webView = getBridge().getWebView();
+
+                          PrintManager printManager =
+                                  (PrintManager) getActivity()
+                                          .getSystemService(Context.PRINT_SERVICE);
+
+                          if (printManager == null) {
+                              call.reject("Printing is not available.");
+                              return;
+                          }
+
+                          String jobName =
+                                  call.getString(
+                                          "jobName",
+                                          "Bahadur Khail Welfare Report"
+                                  );
+
+                          android.print.PrintDocumentAdapter adapter =
+                                  webView.createPrintDocumentAdapter(jobName);
+
+                          printManager.print(
+                                  jobName,
+                                  adapter,
+                                  new PrintAttributes.Builder().build()
+                          );
+
+                          call.resolve();
+
+                      } catch (Exception e) {
+                          call.reject(
+                                  e.getMessage() != null
+                                          ? e.getMessage()
+                                          : "Print failed."
+                          );
+                      }
+
+                  });
+              }
+          }
+          EOF
+
+      - name: Create MainActivity
+        run: |
+          cat > android/app/src/main/java/com/bahadurkhail/welfare/MainActivity.java <<'EOF'
+          package com.bahadurkhail.welfare;
+
+          import android.os.Bundle;
+
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  registerPlugin(NativePrintPlugin.class);
+                  super.onCreate(savedInstanceState);
+              }
+          }
+          EOF
+
+      - name: Add native print call to index
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("www/index.html")
+          s = p.read_text(encoding="utf-8")
+
+          marker = "function printMonthlyReport(){"
+
+          bridge = r"""
+          function printMonthlyReportNative(){
+            try{
+              if(
+                window.Capacitor &&
+                window.Capacitor.Plugins &&
+                window.Capacitor.Plugins.NativePrint
+              ){
+                return window.Capacitor.Plugins.NativePrint.print({
+                  jobName:'Bahadur Khail Welfare - Monthly Report'
+                });
+              }
+            }catch(e){
+              console.error('Native print error:',e);
+            }
+
+            return null;
+          }
+
+          """
+
+          if "function printMonthlyReportNative()" not in s:
+              s = s.replace(marker, bridge + marker, 1)
+
+          p.write_text(s, encoding="utf-8")
+          PY
+
+      - name: Sync Capacitor
         run: npx cap sync android
 
       - name: Build Debug APK
