@@ -207,7 +207,7 @@ footer{
 #monthlyReportBody .report-table tr:hover td{background:#fafdfc}
 #monthlyReportBody .report-footer{background:#f2f8f5;border:1px solid #dceae4;border-radius:14px}
 @media(max-width:760px){#monthlyReportCharts .report-charts{grid-template-columns:1fr!important}#monthlyReportCharts .chart-card:nth-child(3){grid-column:auto}#monthlyReportBody .report-print{padding:12px}}
-@media print{#reports>.tabs,#reports>.sub,#reportBox>.toolbar,#reportBox>.grid,#monthlyReportCharts,#monthlyReportBody .report-footer{display:none!important}#monthlyReportBody .report-print{border:0;box-shadow:none;padding:0}}
+@media print{#reports>.tabs,#reports>.sub,#reportBox>.toolbar,#reportBox>.grid,#monthlyReportCharts,#monthlyReportBody .report-footer{display:none!important}#monthlyReportBody .report-print{border:0;box-shadow:none;padding:0}}\n.print-fallback{background:#fff!important;color:#17344b!important;padding:20px!important}.print-fallback table{width:100%;border-collapse:collapse}.print-fallback th,.print-fallback td{border:1px solid #ccd7df;padding:8px;text-align:left}.print-fallback th{background:#eef5fa}.print-mode .top,.print-mode nav,.print-mode .toolbar,.print-mode .tabs{display:none!important}.print-mode main{padding:0}.print-mode #monthlyReportBody{display:block!important}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-database-compat.js"></script></head>
 <body>
@@ -406,11 +406,17 @@ async function save(){
   localStorage.setItem(K,JSON.stringify(db));
   try{renderAll()}catch(e){console.error("Render after save:",e);}
   if(!window.BHWC||!window.BHWC.root) throw new Error("Firebase is not initialized.");
+
   window.BHWC.saveQueue=(window.BHWC.saveQueue||Promise.resolve()).then(async function(){
     await firebaseReadyWithTimeout(12000);
     await window.BHWC.root.update(cloudPayload());
     return true;
-  }).catch(function(e){window.BHWC.lastError=e;console.error("Firebase save failed:",e);throw e;});
+  }).catch(function(e){
+    window.BHWC.lastError=e;
+    console.error("Firebase save failed:",e);
+    throw e;
+  });
+
   return window.BHWC.saveQueue;
 }
 
@@ -754,24 +760,54 @@ function drawReportCharts(selected){
 async function saveReportSnapshot(type, monthValue){
   const target=monthKey(monthValue)||reportMonthValue();
   let snapshot={id:type+'-'+target,type,month:target,monthLabel:monthLabel(target),generatedAt:new Date().toISOString()};
+
   if(type==='monthly'){
     const m=monthlyReport(target);
-    snapshot={...snapshot,totalMembers:m.active.length,paidMembers:m.paid.length,notPaidMembers:m.not.length,totalCollected:m.total,expected:m.expected,remaining:Math.max(0,m.expected-m.total),
-      paid:m.paid.map(x=>({memberId:x.id,name:x.name,monthlyFund:Number(x.fund||0),paid:Number(m.paidMap.get(String(x.id))||0),date:m.dateMap.get(String(x.id))||''})),
-      notPaid:m.not.map(x=>({memberId:x.id,name:x.name,monthlyFund:Number(x.fund||0),status:'Not Paid'}))};
+    snapshot={
+      ...snapshot,
+      reportKind:'monthly-paid-not-paid',
+      totalMembers:m.active.length,
+      paidMembers:m.paid.length,
+      notPaidMembers:m.not.length,
+      totalCollected:m.total,
+      expected:m.expected,
+      remaining:Math.max(0,m.expected-m.total),
+      paid:m.paid.map(x=>({
+        memberId:x.id,
+        name:x.name,
+        monthlyFund:Number(x.fund||0),
+        paid:Number(m.paidMap.get(String(x.id))||0),
+        date:m.dateMap.get(String(x.id)||'')||''
+      })),
+      notPaid:m.not.map(x=>({
+        memberId:x.id,
+        name:x.name,
+        monthlyFund:Number(x.fund||0),
+        status:'Not Paid'
+      }))
+    };
   }else if(type==='fund'){
     snapshot.totalPayments=db.fund.length;
     snapshot.totalCollected=db.fund.reduce((s,x)=>s+Number(x.paid||0),0);
-    snapshot.rows=db.fund.map(x=>({id:x.id,memberId:x.memberId,memberName:x.memberName||db.members.find(m=>String(m.id)===String(x.memberId))?.name||'Unknown',month:paymentMonthKey(x),date:x.date||'',expected:Number(x.expected||0),paid:Number(x.paid||0)}));
+    snapshot.rows=db.fund.map(x=>({
+      id:x.id,memberId:x.memberId,
+      memberName:x.memberName||db.members.find(m=>String(m.id)===String(x.memberId))?.name||'Unknown',
+      month:paymentMonthKey(x),date:x.date||'',
+      expected:Number(x.expected||0),paid:Number(x.paid||0)
+    }));
   }else if(type==='accounts'){
-    snapshot.income=sum('Income'); snapshot.expenses=sum('Expense'); snapshot.balance=snapshot.income-snapshot.expenses;
+    snapshot.income=sum('Income');
+    snapshot.expenses=sum('Expense');
+    snapshot.balance=snapshot.income-snapshot.expenses;
     snapshot.rows=db.tx.map(x=>({...x}));
   }else{
     snapshot.totalMembers=db.members.length;
     snapshot.totalFundCollected=db.fund.reduce((s,x)=>s+Number(x.paid||0),0);
-    snapshot.totalIncome=sum('Income'); snapshot.totalExpenses=sum('Expense');
+    snapshot.totalIncome=sum('Income');
+    snapshot.totalExpenses=sum('Expense');
     snapshot.balance=snapshot.totalIncome-snapshot.totalExpenses;
   }
+
   if(!Array.isArray(db.reports)) db.reports=[];
   const idx=db.reports.findIndex(x=>x.id===snapshot.id);
   if(idx>=0) db.reports[idx]=snapshot; else db.reports.push(snapshot);
@@ -780,11 +816,24 @@ async function saveReportSnapshot(type, monthValue){
 
   if(!window.BHWC||!window.BHWC.root) throw new Error("Firebase is not initialized.");
   await firebaseReadyWithTimeout(12000);
-  window.BHWC.saveQueue=(window.BHWC.saveQueue||Promise.resolve()).then(()=>window.BHWC.root.update(cloudPayload()));
+
+  window.BHWC.saveQueue=(window.BHWC.saveQueue||Promise.resolve()).then(async function(){
+    const payload={reports:Array.isArray(db.reports)?db.reports:[]};
+    if(type==='monthly'){
+      payload.monthlyReports={};
+      payload.monthlyReports[target]=snapshot;
+    }
+    await window.BHWC.root.update(payload);
+    return true;
+  }).catch(function(e){
+    window.BHWC.lastError=e;
+    console.error("Report cloud save failed:",e);
+    throw e;
+  });
+
   await window.BHWC.saveQueue;
   return true;
 }
-
 function renderMonthlyReport(){
   const input=document.getElementById('reportMonth');
   const body=document.getElementById('monthlyReportBody');
@@ -855,7 +904,7 @@ function reportType(type,btn){
   const box=document.getElementById('reportBox');
   if(!box)return;
   if(type==='monthly'){
-    box.innerHTML=`<div class="toolbar" style="margin-top:0"><label style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px"><b>Report Month</b><select id="reportMonth" onchange="currentReportMonth=this.value;renderMonthlyReport()" style="padding:11px;border:1px solid var(--line);border-radius:12px;flex:1">${monthOptions(currentReportMonth||reportMonthValue())}</select></label><button class="btn" style="background:#0f7a5b" onclick="printMonthlyReport()">🖨️ Print Monthly Report</button></div>
+    box.innerHTML=`<div class="toolbar" style="margin-top:0"><label style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px"><b>Report Month</b><select id="reportMonth" onchange="currentReportMonth=this.value;renderMonthlyReport()" style="padding:11px;border:1px solid var(--line);border-radius:12px;flex:1">${monthOptions(currentReportMonth||reportMonthValue())}</select></label><button class="btn" style="background:#0f7a5b" onclick="saveReportSnapshot('monthly',document.getElementById('reportMonth')?.value||reportMonthValue()).then(()=>toast('Monthly Paid / Not Paid report saved to Firebase.')).catch(e=>toast('Report save failed: '+(e.message||'Please check Firebase.'),'error'))">☁️ Save Report</button><button class="btn" style="background:#0f7a5b" onclick="printMonthlyReport()">🖨️ Print Monthly Report</button></div>
     <div class="grid" style="margin-top:10px"><div class="card metric"><div class="lab">Total Members</div><div class="val" id="rMemberCount">0</div></div><div class="card metric"><div class="lab">Paid</div><div class="val" id="rPaidCount">0</div></div><div class="card metric"><div class="lab">Not Paid</div><div class="val" id="rNotCount">0</div></div><div class="card metric"><div class="lab">Total Collected</div><div class="val" id="rTotalPaid">Rs. 0</div></div></div>
     <div id="monthlyReportCharts"></div><div id="monthlyReportBody" style="margin-top:14px"></div>`;
     renderMonthlyReport();
@@ -872,46 +921,42 @@ function reportType(type,btn){
   saveReportSnapshot(type,currentReportMonth||reportMonthValue()).catch(err=>{console.error('Report save failed:',err);toast('Report cloud save failed: '+(err.message||'Please check Firebase.'),'error');});
 }
 function printMonthlyReport(){
-
-  // Android/Capacitor print fallback: print the existing report in the
-  // current WebView instead of relying on window.open().
-  if(window.Capacitor && window.Capacitor.getPlatform &&
-     window.Capacitor.getPlatform()==='android'){
-    const printable=document.getElementById('monthlyReportBody');
-    if(printable){
-      const original=document.body.innerHTML;
-      const report=printable.innerHTML;
-      document.body.innerHTML=`<!doctype html><html><head>
-      <meta charset="utf-8"><title>Monthly Fund Report</title>
-      <style>
-      body{font-family:Arial,sans-serif;padding:24px;color:#17344b}
-      table{width:100%;border-collapse:collapse;margin-top:10px}
-      th,td{border:1px solid #ccd7df;padding:8px;text-align:left}
-      th{background:#eef5fa}
-      h2,h3{margin-top:18px}
-      .report-footer{margin-top:20px;padding:12px;border:1px solid #dbe6ee;background:#f5f9fc}
-      @media print{body{padding:0}}
-      </style></head><body>
-      <h2>Bahadur Khail Welfare Community</h2>${report}
-      </body></html>`;
-      setTimeout(function(){
-        window.print();
-        setTimeout(function(){
-          document.body.innerHTML=original;
-          try{renderAll()}catch(e){console.error(e)}
-        },1000);
-      },300);
-      return;
-    }
-  }
   const monthValue=document.getElementById('reportMonth')?.value||reportMonthValue();
   const m=monthlyReport(monthValue), label=monthLabel(monthValue);
   const rowsPaid=m.paid.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td>${money(m.paidMap.get(String(x.id))||0)}</td><td>${esc(m.dateMap.get(String(x.id))||'—')}</td></tr>`).join('')||'<tr><td colspan="5">No paid members.</td></tr>';
   const rowsNot=m.not.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td>Not Paid</td></tr>`).join('')||'<tr><td colspan="4">Everyone has paid.</td></tr>';
+
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Monthly Fund Report - ${esc(label)}</title>
+  <style>body{font-family:Arial,sans-serif;padding:28px;color:#17344b}h1{font-size:22px;margin:0 0 5px}h2{font-size:18px;margin-top:26px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccd7df;padding:8px;text-align:left}th{background:#eef5fa}.summary{padding:12px;background:#f5f9fc;border:1px solid #dbe6ee;margin:15px 0}@media print{body{padding:0}}</style>
+  </head><body><h1>Bahadur Khail Welfare Community</h1><h2>Monthly Fund Report — ${esc(label)}</h2>
+  <div class="summary"><b>Report Month:</b> ${esc(label)} &nbsp; | &nbsp; <b>Total Members:</b> ${m.active.length} &nbsp; | &nbsp; <b>Paid:</b> ${m.paid.length} &nbsp; | &nbsp; <b>Not Paid:</b> ${m.not.length} &nbsp; | &nbsp; <b>Total Collected:</b> ${money(m.total)} &nbsp; | &nbsp; <b>Remaining:</b> ${money(Math.max(0,m.expected-m.total))}</div>
+  <h2>Paid Members (${m.paid.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Paid</th><th>Payment Date</th></tr></thead><tbody>${rowsPaid}</tbody></table>
+  <h2>Not Paid Members (${m.not.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Status</th></tr></thead><tbody>${rowsNot}</tbody></table></body></html>`;
+
   const w=window.open('','_blank');
-  if(!w)return alert('Please allow pop-ups to print the report.');
-  w.document.write(`<!doctype html><html><head><title>Monthly Fund Report - ${esc(label)}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#17344b}h1{font-size:22px;margin:0 0 5px}h2{font-size:18px;margin-top:26px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccd7df;padding:8px;text-align:left}th{background:#eef5fa}.summary{padding:12px;background:#f5f9fc;border:1px solid #dbe6ee;margin:15px 0}@media print{body{padding:0}}</style></head><body><h1>Bahadur Khail Welfare Community</h1><h2>Monthly Fund Report — ${esc(label)}</h2><div class="summary"><b>Report Month:</b> ${esc(label)} &nbsp; | &nbsp; <b>Total Members:</b> ${m.active.length} &nbsp; | &nbsp; <b>Paid:</b> ${m.paid.length} &nbsp; | &nbsp; <b>Not Paid:</b> ${m.not.length} &nbsp; | &nbsp; <b>Total Collected:</b> ${money(m.total)}</div><h2>Paid Members (${m.paid.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Paid</th><th>Payment Date</th></tr></thead><tbody>${rowsPaid}</tbody></table><h2>Not Paid Members (${m.not.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Status</th></tr></thead><tbody>${rowsNot}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`);
-  w.document.close();
+  if(w){
+    w.document.open(); w.document.write(html); w.document.close();
+    setTimeout(()=>{try{w.focus();w.print();}catch(e){console.error('Popup print:',e);}},350);
+    return;
+  }
+
+  // Android WebView fallback: temporarily render the report in the current page.
+  const root=document.getElementById('monthlyReportBody');
+  if(!root)return alert('Unable to open the print view.');
+  const oldHtml=root.innerHTML, oldClass=root.className;
+  root.className='print-fallback';
+  const cleanHtml=html
+    .replace(/<html>/gi,'')
+    .replace(/<\/html>/gi,'')
+    .replace(/<head>[\s\S]*?<\/head>/gi,'')
+    .replace(/<body>/gi,'')
+    .replace(/<\/body>/gi,'');
+  root.innerHTML=cleanHtml;
+  document.body.classList.add('print-mode');
+  setTimeout(()=>{
+    try{window.print();}catch(e){alert('Print is not available in this Android WebView.');}
+    setTimeout(()=>{root.innerHTML=oldHtml;root.className=oldClass;document.body.classList.remove('print-mode');},500);
+  },150);
 }
 function backup(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Bahadur_Khail_Welfare_Backup.json';a.click()}
 function restore(inp){let f=inp.files[0];if(!f)return;let r=new FileReader();r.onload=async()=>{try{let x=JSON.parse(r.result);if(!x.members||!x.fund||!x.tx)throw 0;db={...defaultDB,...x,members:Array.isArray(x.members)?x.members:[],fund:Array.isArray(x.fund)?x.fund:[],tx:Array.isArray(x.tx)?x.tx:[],notices:Array.isArray(x.notices)?x.notices:[],reports:Array.isArray(x.reports)?x.reports:[],settings:x.settings||defaultDB.settings,pin:x.pin||defaultDB.pin};await save();alert('Backup restored and saved to Firebase.')}catch(err){console.error('Restore:',err);alert(err?.message||'Invalid backup file.')}};r.readAsText(f)}
