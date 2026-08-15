@@ -209,7 +209,7 @@ footer{
 @media(max-width:760px){#monthlyReportCharts .report-charts{grid-template-columns:1fr!important}#monthlyReportCharts .chart-card:nth-child(3){grid-column:auto}#monthlyReportBody .report-print{padding:12px}}
 @media print{#reports>.tabs,#reports>.sub,#reportBox>.toolbar,#reportBox>.grid,#monthlyReportCharts,#monthlyReportBody .report-footer{display:none!important}#monthlyReportBody .report-print{border:0;box-shadow:none;padding:0}}\n.print-fallback{background:#fff!important;color:#17344b!important;padding:20px!important}.print-fallback table{width:100%;border-collapse:collapse}.print-fallback th,.print-fallback td{border:1px solid #ccd7df;padding:8px;text-align:left}.print-fallback th{background:#eef5fa}.print-mode .top,.print-mode nav,.print-mode .toolbar,.print-mode .tabs{display:none!important}.print-mode main{padding:0}.print-mode #monthlyReportBody{display:block!important}
 </style>
-<script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-database-compat.js"></script></head>
+<script src="firebase-app-compat.js"></script><script src="firebase-auth-compat.js"></script><script src="firebase-database-compat.js"></script></head>
 <body>
 <div id="login" class="login"><div class="loginbox">
 <div class="logoMark">BH</div><h1>Bahadur Khail Welfare Community</h1><p>امید • یکجہتی • خدمت</p>
@@ -339,6 +339,7 @@ function bhwcApply(v){
   }catch(e){console.error('Firebase render:',e)}
 }
 try{
+  if(typeof window.firebase==='undefined')throw new Error('Firebase SDK files are missing from the app build.');
   const firebaseConfig={apiKey:'AIzaSyABjlhHEjHdNr6-xZfqlBFSjYXtLO0iE6U',authDomain:'bahadurkhail-welfare-community.firebaseapp.com',databaseURL:'https://bahadurkhail-welfare-community-default-rtdb.firebaseio.com',projectId:'bahadurkhail-welfare-community',storageBucket:'bahadurkhail-welfare-community.firebasestorage.app',messagingSenderId:'934004243813',appId:'1:934004243813:web:054dac138df7f933bf358c',measurementId:'G-R8XYW0DXKD'};
   if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
   window.BHWC.auth=firebase.auth();window.BHWC.root=firebase.database().ref('appData');
