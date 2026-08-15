@@ -14,11 +14,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -29,12 +28,12 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Create package.json
+      - name: Create package
         run: npm init -y
 
-      - name: Install Capacitor
+      - name: Install Capacitor and Firebase
         run: |
-          npm install @capacitor/core@8 @capacitor/android@8
+          npm install @capacitor/core@8 @capacitor/android@8 firebase@12.16.0
           npm install --save-dev @capacitor/cli@8
 
       - name: Create Capacitor config
@@ -47,7 +46,7 @@ jobs:
           }
           EOF
 
-      - name: Prepare App
+      - name: Prepare index.html
         run: |
           set -e
 
@@ -58,8 +57,70 @@ jobs:
 
           cp index.html www/index.html
 
-          echo "index.html copied successfully:"
+          echo "index.html:"
           ls -lh www/index.html
+
+      - name: Install Firebase compat SDK files
+        run: |
+          set -e
+
+          mkdir -p www/firebase
+
+          cp node_modules/firebase/compat/app/dist/index.cjs.js \
+             www/firebase/firebase-app-compat.js
+
+          cp node_modules/firebase/compat/auth/dist/index.cjs.js \
+             www/firebase/firebase-auth-compat.js
+
+          cp node_modules/firebase/compat/database/dist/index.cjs.js \
+             www/firebase/firebase-database-compat.js
+
+          echo "Firebase files:"
+          ls -lh www/firebase/
+
+      - name: Patch Firebase scripts
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path("www/index.html")
+          s = p.read_text(encoding="utf-8")
+
+          # Remove old Firebase CDN script tags.
+          s = re.sub(
+              r'<script[^>]+firebase[^>]*></script>',
+              '',
+              s,
+              flags=re.I
+          )
+
+          firebase_scripts = """
+          <script src="firebase/firebase-app-compat.js"></script>
+          <script src="firebase/firebase-auth-compat.js"></script>
+          <script src="firebase/firebase-database-compat.js"></script>
+          """
+
+          if "</head>" in s:
+              s = s.replace("</head>", firebase_scripts + "\n</head>", 1)
+          else:
+              s = firebase_scripts + "\n" + s
+
+          p.write_text(s, encoding="utf-8")
+          PY
+
+          echo "Firebase references:"
+          grep -n "firebase.*compat" www/index.html || true
+
+      - name: Verify Firebase files
+        run: |
+          set -e
+
+          test -f www/firebase/firebase-app-compat.js
+          test -f www/firebase/firebase-auth-compat.js
+          test -f www/firebase/firebase-database-compat.js
+
+          echo "Firebase SDK files are present."
 
       - name: Add Android
         run: npx cap add android
@@ -67,13 +128,18 @@ jobs:
       - name: Sync Android
         run: npx cap sync android
 
-      - name: Verify Android Web Assets
+      - name: Verify Android assets
         run: |
           set -e
-          test -f www/index.html
-          echo "Web app ready."
 
-      - name: Build Debug APK
+          test -f www/index.html
+          test -f www/firebase/firebase-app-compat.js
+          test -f www/firebase/firebase-auth-compat.js
+          test -f www/firebase/firebase-database-compat.js
+
+          echo "Android web assets verified."
+
+      - name: Build APK
         run: |
           cd android
           chmod +x gradlew
@@ -81,14 +147,8 @@ jobs:
 
       - name: Check APK
         run: |
-          set -e
-
-          APK="android/app/build/outputs/apk/debug/app-debug.apk"
-
-          test -f "$APK"
-
-          echo "APK successfully created:"
-          ls -lh "$APK"
+          test -f android/app/build/outputs/apk/debug/app-debug.apk
+          ls -lh android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
