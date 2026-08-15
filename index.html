@@ -269,7 +269,6 @@ footer{
     <button class="quick-btn-v3 q1" onclick="openMember()">＋ Add Member<br><small>New member</small></button>
     <button class="quick-btn-v3 q2" onclick="openFund()">＋ Add Payment<br><small>Record payment</small></button>
     <button class="quick-btn-v3 q3" onclick="go('reports')">▥ Reports<br><small>View reports</small></button>
-    <button class="quick-btn-v3 q4" onclick="go('reports');setTimeout(()=>reportType('monthly',document.querySelector('.tabs button[onclick*=monthly]')),50)">🖨 Monthly Report<br><small>Print / Download</small></button>
   </div></div>
 
   <div class="recent-v3"><div class="recent-head-v3"><h3>💳 Recent Payments</h3><button class="btn light" onclick="go('fund')">View All</button></div><div class="recent-list-v3">
@@ -319,74 +318,76 @@ function bhwcMerge(remote,local,base){
   const rm=new Map(remote.map(x=>[bhwcId(x),x])), bm=new Map(base.map(x=>[bhwcId(x),x])), lm=new Map(local.map(x=>[bhwcId(x),x]));
   local.forEach(x=>{const id=bhwcId(x);if(!id)return;const old=bm.get(id);if(!old||!bhwcEq(old,x))rm.set(id,bhwcClone(x))});
   base.forEach(old=>{const id=bhwcId(old);if(!id||lm.has(id))return;const now=rm.get(id);if(!now||bhwcEq(now,old))rm.delete(id)});
-  const out=[],used=new Set(); remote.forEach(x=>{const id=bhwcId(x);if(id&&rm.has(id)){out.push(rm.get(id));used.add(id)}}); local.forEach(x=>{const id=bhwcId(x);if(id&&rm.has(id)&&!used.has(id)){out.push(rm.get(id));used.add(id)}}); return out;
+  const out=[],used=new Set();
+  remote.forEach(x=>{const id=bhwcId(x);if(id&&rm.has(id)){out.push(rm.get(id));used.add(id)}});
+  local.forEach(x=>{const id=bhwcId(x);if(id&&rm.has(id)&&!used.has(id)){out.push(rm.get(id));used.add(id)}});
+  return out;
 }
 function bhwcApply(v){const clean=bhwcNorm(v);window.BHWC.lastRemote=bhwcClone(clean);db=clean;localStorage.setItem(K,JSON.stringify(db));try{renderAll()}catch(e){console.error('Firebase render:',e)}}
 try{
- const firebaseConfig={apiKey:'AIzaSyABjlhHEjHdNr6-xZfqlBFSjYXtLO0iE6U',authDomain:'bahadurkhail-welfare-community.firebaseapp.com',databaseURL:'https://bahadurkhail-welfare-community-default-rtdb.firebaseio.com',projectId:'bahadurkhail-welfare-community',storageBucket:'bahadurkhail-welfare-community.firebasestorage.app',messagingSenderId:'934004243813',appId:'1:934004243813:web:054dac138df7f933bf358c',measurementId:'G-R8XYW0DXKD'};
- if(!firebase.apps.length)firebase.initializeApp(firebaseConfig); window.BHWC.auth=firebase.auth(); window.BHWC.root=firebase.database().ref('appData');
- window.BHWC.readyPromise=window.BHWC.auth.signInAnonymously().then(function(cred){window.BHWC.user=cred&&cred.user?cred.user:null;if(!window.BHWC.user)throw new Error('Firebase anonymous authentication failed.');return window.BHWC.root.once('value')}).then(function(snap){
-   const remote=snap.val();
-   if(remote&&typeof remote==='object') bhwcApply(remote);
-   else {const initial=bhwcNorm(db);return window.BHWC.root.set(initial).then(function(){bhwcApply(initial)})}
-   window.BHWC.root.on('value',function(snap){if(window.BHWC.syncing)return;const v=snap.val();if(v&&typeof v==='object')bhwcApply(v)});
- }).then(function(){window.BHWC.ready=true;return true}).catch(function(e){window.BHWC.ready=false;window.BHWC.lastError=e;console.error('Firebase init/sync failed:',e);throw e});
+  const firebaseConfig={apiKey:'AIzaSyABjlhHEjHdNr6-xZfqlBFSjYXtLO0iE6U',authDomain:'bahadurkhail-welfare-community.firebaseapp.com',databaseURL:'https://bahadurkhail-welfare-community-default-rtdb.firebaseio.com',projectId:'bahadurkhail-welfare-community',storageBucket:'bahadurkhail-welfare-community.firebasestorage.app',messagingSenderId:'934004243813',appId:'1:934004243813:web:054dac138df7f933bf358c',measurementId:'G-R8XYW0DXKD'};
+  if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+  window.BHWC.auth=firebase.auth();window.BHWC.root=firebase.database().ref('appData');
+  window.BHWC.readyPromise=window.BHWC.auth.signInAnonymously().then(function(cred){
+    window.BHWC.user=cred&&cred.user?cred.user:null;if(!window.BHWC.user)throw new Error('Firebase anonymous authentication failed.');return window.BHWC.root.once('value');
+  }).then(function(snap){
+    const remote=snap.val();
+    if(remote&&typeof remote==='object'){bhwcApply(remote)}else{const initial=bhwcNorm(db);return window.BHWC.root.set(initial).then(function(){bhwcApply(initial)})}
+    // IMPORTANT: keep Android and website connected after the first load.
+    window.BHWC.root.on('value',function(snap){if(window.BHWC.syncing)return;const v=snap.val();if(v&&typeof v==='object')bhwcApply(v)});
+  }).then(function(){window.BHWC.ready=true;return true}).catch(function(e){window.BHWC.ready=false;window.BHWC.lastError=e;console.error('Firebase init/sync failed:',e);throw e});
 }catch(e){window.BHWC.readyPromise=Promise.reject(e);console.error('Firebase init:',e)}
-
-function toast(message,type){
-  const old=document.querySelector(".bhwc-toast");
-  if(old)old.remove();
-  const el=document.createElement("div");
-  el.className="bhwc-toast";
-  el.textContent=message;
-  el.style.cssText="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;padding:12px 18px;border-radius:12px;background:"+(type==="error"?"#b42318":"#0f7a5b")+";color:#fff;font:600 14px Arial,sans-serif;box-shadow:0 8px 25px rgba(0,0,0,.25);max-width:90%;text-align:center;";
-  document.body.appendChild(el);
-  setTimeout(()=>el.remove(),2800);
-}
-
-function firebaseReadyWithTimeout(ms){
-  ms=Number(ms)||12000;
-  if(window.BHWC&&window.BHWC.ready)return Promise.resolve(true);
-  const p=(window.BHWC&&window.BHWC.readyPromise)||Promise.reject(new Error("Firebase is not initialized."));
-  return Promise.race([
-    p.then(()=>{if(!window.BHWC.ready)throw new Error("Firebase is not connected yet.");return true;}),
-    new Promise((_,reject)=>setTimeout(()=>reject(new Error("Firebase connection timed out. Check Firebase Authentication (Anonymous) and Realtime Database Rules / internet connection.")),ms))
-  ]);
-}
-function cloudPayload(){return {
-  members:Array.isArray(db.members)?db.members:[],
-  fund:Array.isArray(db.fund)?db.fund:[],
-  tx:Array.isArray(db.tx)?db.tx:[],
-  notices:Array.isArray(db.notices)?db.notices:[],
-  reports:Array.isArray(db.reports)?db.reports:[],
-  settings:db.settings||{},
-  pin:db.pin||"1234"
-};}
+function toast(message,type){const old=document.querySelector('.bhwc-toast');if(old)old.remove();const el=document.createElement('div');el.className='bhwc-toast';el.textContent=message;el.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;padding:12px 18px;border-radius:12px;background:'+(type==='error'?'#b42318':'#0f7a5b')+';color:#fff;font:600 14px Arial,sans-serif;box-shadow:0 8px 25px rgba(0,0,0,.25);max-width:90%;text-align:center;';document.body.appendChild(el);setTimeout(()=>el.remove(),2800)}
+function firebaseReadyWithTimeout(ms){ms=Number(ms)||12000;if(window.BHWC&&window.BHWC.ready)return Promise.resolve(true);const p=(window.BHWC&&window.BHWC.readyPromise)||Promise.reject(new Error('Firebase is not initialized.'));return Promise.race([p.then(()=>{if(!window.BHWC.ready)throw new Error('Firebase is not connected yet.');return true}),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Firebase connection timed out.')),ms))])}
+function cloudPayload(){return{members:Array.isArray(db.members)?db.members:[],fund:Array.isArray(db.fund)?db.fund:[],tx:Array.isArray(db.tx)?db.tx:[],notices:Array.isArray(db.notices)?db.notices:[],reports:Array.isArray(db.reports)?db.reports:[],settings:db.settings||{},pin:db.pin||'1234'}}
 async function save(){
-  localStorage.setItem(K,JSON.stringify(db)); try{renderAll()}catch(e){}
-  if(!window.BHWC||!window.BHWC.root)throw new Error('Firebase is not initialized.');
+  // Always save locally first so the UI stays responsive.
+  localStorage.setItem(K,JSON.stringify(db));
+  try{renderAll()}catch(e){console.error("Render after save:",e)}
+
+  if(!window.BHWC||!window.BHWC.root){
+    throw new Error("Firebase is not initialized.");
+  }
+
   const wanted=bhwcClone(db);
+
+  // Queue only the current save, but DO NOT transaction the entire appData node.
+  // Updating only changed top-level children prevents one stale client from
+  // overwriting another client's unrelated Members/Fund/Tx/Notices data.
   window.BHWC.saveQueue=(window.BHWC.saveQueue||Promise.resolve()).then(async function(){
     await firebaseReadyWithTimeout(12000);
+
     const base=bhwcClone(window.BHWC.lastRemote||bhwcNorm(null));
-    const changes={members:!bhwcEq(base.members,wanted.members),fund:!bhwcEq(base.fund,wanted.fund),tx:!bhwcEq(base.tx,wanted.tx),notices:!bhwcEq(base.notices,wanted.notices),reports:!bhwcEq(base.reports,wanted.reports),settings:!bhwcEq(base.settings,wanted.settings),pin:String(base.pin||'1234')!==String(wanted.pin||'1234')};
+    const patch={};
+
+    if(!bhwcEq(base.members,wanted.members))patch.members=wanted.members;
+    if(!bhwcEq(base.fund,wanted.fund))patch.fund=wanted.fund;
+    if(!bhwcEq(base.tx,wanted.tx))patch.tx=wanted.tx;
+    if(!bhwcEq(base.notices,wanted.notices))patch.notices=wanted.notices;
+    if(!bhwcEq(base.reports,wanted.reports))patch.reports=wanted.reports;
+    if(!bhwcEq(base.settings,wanted.settings))patch.settings=wanted.settings||{};
+    if(String(base.pin||'1234')!==String(wanted.pin||'1234'))patch.pin=String(wanted.pin||'1234');
+
+    if(!Object.keys(patch).length)return true;
+
     window.BHWC.syncing=true;
     try{
-      const result=await window.BHWC.root.transaction(function(current){
-        const remote=bhwcNorm(current);
-        if(changes.members)remote.members=bhwcMerge(remote.members,wanted.members,base.members);
-        if(changes.fund)remote.fund=bhwcMerge(remote.fund,wanted.fund,base.fund);
-        if(changes.tx)remote.tx=bhwcMerge(remote.tx,wanted.tx,base.tx);
-        if(changes.notices)remote.notices=bhwcMerge(remote.notices,wanted.notices,base.notices);
-        if(changes.reports)remote.reports=bhwcMerge(remote.reports,wanted.reports,base.reports);
-        if(changes.settings)remote.settings=bhwcClone(wanted.settings||{});
-        if(changes.pin)remote.pin=String(wanted.pin||'1234');
-        return remote;
-      });
-      if(!result.committed)throw new Error('Firebase transaction was not committed.');
-      bhwcApply(result.snapshot.val()); return true;
-    }finally{window.BHWC.syncing=false}
-  }).catch(function(e){window.BHWC.lastError=e;console.error('Firebase save failed:',e);throw e});
+      // ONE fast atomic update at appData's child level.
+      await window.BHWC.root.update(patch);
+
+      // Do not wait for a second full database read. The realtime listener
+      // will deliver the server state to both Website and Android.
+      window.BHWC.lastError=null;
+      return true;
+    }finally{
+      window.BHWC.syncing=false;
+    }
+  }).catch(function(e){
+    window.BHWC.lastError=e;
+    console.error("Firebase save failed:",e);
+    throw e;
+  });
+
   return window.BHWC.saveQueue;
 }
 
@@ -795,7 +796,7 @@ async function saveReportSnapshot(type, monthValue){
       payload.monthlyReports={};
       payload.monthlyReports[target]=snapshot;
     }
-    await window.BHWC.root.child('reports').set(payload.reports);
+    await window.BHWC.root.update(payload);
     return true;
   }).catch(function(e){
     window.BHWC.lastError=e;
@@ -876,7 +877,7 @@ function reportType(type,btn){
   const box=document.getElementById('reportBox');
   if(!box)return;
   if(type==='monthly'){
-    box.innerHTML=`<div class="toolbar" style="margin-top:0"><label style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px"><b>Report Month</b><select id="reportMonth" onchange="currentReportMonth=this.value;renderMonthlyReport()" style="padding:11px;border:1px solid var(--line);border-radius:12px;flex:1">${monthOptions(currentReportMonth||reportMonthValue())}</select></label><button class="btn" style="background:#0f7a5b" onclick="saveReportSnapshot('monthly',document.getElementById('reportMonth')?.value||reportMonthValue()).then(()=>toast('Monthly Paid / Not Paid report saved to Firebase.')).catch(e=>toast('Report save failed: '+(e.message||'Please check Firebase.'),'error'))">☁️ Save Report</button><button class="btn" style="background:#0f7a5b" onclick="printMonthlyReport()">🖨️ Print Monthly Report</button></div>
+    box.innerHTML=`<div class="toolbar" style="margin-top:0"><label style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px"><b>Report Month</b><select id="reportMonth" onchange="currentReportMonth=this.value;renderMonthlyReport()" style="padding:11px;border:1px solid var(--line);border-radius:12px;flex:1">${monthOptions(currentReportMonth||reportMonthValue())}</select></label><button class="btn" style="background:#0f7a5b" onclick="saveReportSnapshot('monthly',document.getElementById('reportMonth')?.value||reportMonthValue()).then(()=>toast('Monthly Paid / Not Paid report saved to Firebase.')).catch(e=>toast('Report save failed: '+(e.message||'Please check Firebase.'),'error'))">☁️ Save Report</button></div>
     <div class="grid" style="margin-top:10px"><div class="card metric"><div class="lab">Total Members</div><div class="val" id="rMemberCount">0</div></div><div class="card metric"><div class="lab">Paid</div><div class="val" id="rPaidCount">0</div></div><div class="card metric"><div class="lab">Not Paid</div><div class="val" id="rNotCount">0</div></div><div class="card metric"><div class="lab">Total Collected</div><div class="val" id="rTotalPaid">Rs. 0</div></div></div>
     <div id="monthlyReportCharts"></div><div id="monthlyReportBody" style="margin-top:14px"></div>`;
     renderMonthlyReport();
@@ -909,59 +910,10 @@ function safePrintReport(title){
   }catch(e){console.error('Browser print:',e);}
   return false;
 }
-
-function printMonthlyReport(){
-  const monthValue=document.getElementById('reportMonth')?.value||reportMonthValue();
-  const m=monthlyReport(monthValue), label=monthLabel(monthValue);
-  const rowsPaid=m.paid.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td>${money(m.paidMap.get(String(x.id))||0)}</td><td>${esc(m.dateMap.get(String(x.id))||'—')}</td></tr>`).join('')||'<tr><td colspan="5">No paid members.</td></tr>';
-  const rowsNot=m.not.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td>Not Paid</td></tr>`).join('')||'<tr><td colspan="4">Everyone has paid.</td></tr>';
-
-  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Monthly Fund Report - ${esc(label)}</title>
-  <style>body{font-family:Arial,sans-serif;padding:28px;color:#17344b}h1{font-size:22px;margin:0 0 5px}h2{font-size:18px;margin-top:26px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccd7df;padding:8px;text-align:left}th{background:#eef5fa}.summary{padding:12px;background:#f5f9fc;border:1px solid #dbe6ee;margin:15px 0}@media print{body{padding:0}}</style>
-  </head><body><h1>Bahadur Khail Welfare Community</h1><h2>Monthly Fund Report — ${esc(label)}</h2>
-  <div class="summary"><b>Report Month:</b> ${esc(label)} &nbsp; | &nbsp; <b>Total Members:</b> ${m.active.length} &nbsp; | &nbsp; <b>Paid:</b> ${m.paid.length} &nbsp; | &nbsp; <b>Not Paid:</b> ${m.not.length} &nbsp; | &nbsp; <b>Total Collected:</b> ${money(m.total)} &nbsp; | &nbsp; <b>Remaining:</b> ${money(Math.max(0,m.expected-m.total))}</div>
-  <h2>Paid Members (${m.paid.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Paid</th><th>Payment Date</th></tr></thead><tbody>${rowsPaid}</tbody></table>
-  <h2>Not Paid Members (${m.not.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Status</th></tr></thead><tbody>${rowsNot}</tbody></table></body></html>`;
-
-  const w=window.open('','_blank');
-  if(w){
-    w.document.open(); w.document.write(html); w.document.close();
-    setTimeout(()=>{try{w.focus();w.print();}catch(e){console.error('Popup print:',e);}},350);
-    return;
-  }
-
-  // Android WebView fallback: temporarily render the report in the current page.
-  const root=document.getElementById('monthlyReportBody');
-  if(!root)return alert('Unable to open the print view.');
-  const oldHtml=root.innerHTML, oldClass=root.className;
-  root.className='print-fallback';
-  const cleanHtml=html
-    .replace(/<html>/gi,'')
-    .replace(/<\/html>/gi,'')
-    .replace(/<head>[\s\S]*?<\/head>/gi,'')
-    .replace(/<body>/gi,'')
-    .replace(/<\/body>/gi,'');
-  root.innerHTML=cleanHtml;
-  document.body.classList.add('print-mode');
-  setTimeout(()=>{
-    try{window.print();}catch(e){alert('Print is not available in this Android WebView.');}
-    setTimeout(()=>{root.innerHTML=oldHtml;root.className=oldClass;document.body.classList.remove('print-mode');},500);
-  },150);
-}
-function backup(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Bahadur_Khail_Welfare_Backup.json';a.click()}
 function restore(inp){let f=inp.files[0];if(!f)return;let r=new FileReader();r.onload=async()=>{try{let x=JSON.parse(r.result);if(!x.members||!x.fund||!x.tx)throw 0;db={...defaultDB,...x,members:Array.isArray(x.members)?x.members:[],fund:Array.isArray(x.fund)?x.fund:[],tx:Array.isArray(x.tx)?x.tx:[],notices:Array.isArray(x.notices)?x.notices:[],reports:Array.isArray(x.reports)?x.reports:[],settings:x.settings||defaultDB.settings,pin:x.pin||defaultDB.pin};await save();alert('Backup restored and saved to Firebase.')}catch(err){console.error('Restore:',err);alert(err?.message||'Invalid backup file.')}};r.readAsText(f)}
 function saveSettings(){db.settings.name=document.getElementById('orgName').value;db.settings.tag=document.getElementById('tagline').value;document.querySelectorAll('.brand h1').forEach(x=>x.textContent=db.settings.name);document.querySelectorAll('.brand small').forEach(x=>x.textContent=db.settings.tag);save().then(()=>alert('Settings saved successfully to Firebase.')).catch(err=>alert('Settings cloud save failed: '+(err.message||'Please try again.')))}
 function changePin(){let p=document.getElementById('newPin').value;if(!/^[0-9]{4,8}$/.test(p))return alert('PIN must be 4–8 digits.');db.pin=p;save().then(()=>{document.getElementById('newPin').value='';alert('PIN changed and saved to Firebase.')}).catch(err=>alert('PIN cloud save failed: '+(err.message||'Please try again.')))}
-async function clearData(){
-  if(!confirm('This will permanently remove all local records and Firebase records. Continue?'))return;
-  const old=bhwcClone(db);
-  try{
-    await firebaseReadyWithTimeout(12000); window.BHWC.syncing=true;
-    try{await window.BHWC.root.set({members:[],fund:[],tx:[],notices:[],reports:[],settings:old.settings||{},pin:old.pin||'1234'})}finally{window.BHWC.syncing=false}
-    db={...defaultDB,members:[],fund:[],tx:[],notices:[],reports:[],settings:old.settings||{},pin:old.pin||'1234'};
-    window.BHWC.lastRemote=bhwcClone(db); localStorage.setItem(K,JSON.stringify(db)); renderAll(); alert('All data cleared from Firebase and this device.');
-  }catch(err){db=old;localStorage.setItem(K,JSON.stringify(db));try{renderAll()}catch(e){}alert('Cloud clear failed: '+(err.message||'Please try again.'))}
-}
+async function clearData(){if(!confirm('This will permanently remove all local records. Continue?'))return;const old=bhwcClone(db);try{await firebaseReadyWithTimeout(12000);window.BHWC.syncing=true;try{await window.BHWC.root.set({members:[],fund:[],tx:[],notices:[],reports:[],settings:old.settings||{},pin:old.pin||'1234'})}finally{window.BHWC.syncing=false}db={...defaultDB,members:[],fund:[],tx:[],notices:[],reports:[],settings:old.settings||{},pin:old.pin||'1234'};window.BHWC.lastRemote=bhwcClone(db);localStorage.setItem(K,JSON.stringify(db));renderAll();alert('All records cleared from Firebase.')}catch(err){db=old;localStorage.setItem(K,JSON.stringify(db));renderAll();alert('Cloud clear failed: '+(err.message||'Please try again.'))}}
 function renderAll(){
   const keepType=currentReportType||'summary';
   const keepMonth=currentReportMonth||reportMonthValue();
