@@ -237,7 +237,7 @@ footer{
 .logout-v3{border:1px solid #ffffff42;background:#ffffff14;color:#fff;padding:10px 13px;border-radius:14px;font-weight:800}
 .hero-v3 .eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:800;opacity:.82;margin-top:18px}.hero-v3 h2{font-size:29px;line-height:1.1;margin:6px 0;color:#fff}.hero-v3 .headname{font-size:16px;font-weight:850;margin-top:8px}.hero-v3 .headname span{color:#72f0a9}.hero-v3 .datepill{display:inline-flex;margin-top:12px;padding:8px 12px;border-radius:999px;background:#ffffff18;font-size:12px}
 .kpi-v3{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.kpi-card-v3{background:#fff;border:1px solid #e1ebe7;border-radius:18px;padding:15px;box-shadow:0 8px 24px rgba(20,57,49,.07)}.kpi-icon-v3{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:19px;background:#e9f8ef}.kpi-card-v3:nth-child(2) .kpi-icon-v3{background:#eaf4ff}.kpi-card-v3:nth-child(3) .kpi-icon-v3{background:#fff0f0}.kpi-card-v3:nth-child(4) .kpi-icon-v3{background:#f2eaff}.kpi-label-v3{font-size:11px;color:#71817b;font-weight:850;margin-top:9px}.kpi-value-v3{font-size:25px;font-weight:900;color:#153d34;margin-top:5px;letter-spacing:-.02em}.kpi-note-v3{font-size:10px;color:#8b9893;margin-top:3px}
-.chart-grid-v3{display:grid;grid-template-columns:1fr 1fr;gap:12px}.chart-v3{background:#fff;border:1px solid #e1ebe7;border-radius:18px;padding:14px;box-shadow:0 8px 24px rgba(20,57,49,.06)}.chart-v3 h3{margin:0;color:#173b33;font-size:15px}.chart-v3 .subv3{font-size:11px;color:#7a8984;margin-top:3px}.dash-canvas-v3{width:100%;height:205px;display:block;margin-top:8px}
+
 .quick-v3{background:#fff;border:1px solid #e1ebe7;border-radius:18px;padding:14px;box-shadow:0 8px 24px rgba(20,57,49,.06)}.quick-v3 h3{margin:0 0 10px;color:#173b33}.quick-grid-v3{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.quick-btn-v3{border:0;border-radius:13px;padding:12px 9px;color:#fff;font-weight:850;min-height:64px;box-shadow:0 6px 14px rgba(20,57,49,.12)}.q1{background:linear-gradient(135deg,#0f7a50,#1aa86d)}.q2{background:linear-gradient(135deg,#075fc2,#2188e8)}.q3{background:linear-gradient(135deg,#6b2ad3,#9b4cf0)}.q4{background:linear-gradient(135deg,#e36a0b,#f38b2c)}
 .recent-v3{background:#fff;border:1px solid #e1ebe7;border-radius:18px;padding:14px;box-shadow:0 8px 24px rgba(20,57,49,.06)}.recent-head-v3{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.recent-head-v3 h3{margin:0;color:#173b33}.recent-list-v3{overflow:auto}.recent-row-v3{display:grid;grid-template-columns:1.5fr .8fr .9fr .7fr;gap:8px;padding:10px 8px;border-bottom:1px solid #edf2f0;font-size:12px;align-items:center}.recent-row-v3.head{background:#087650;color:#fff;border-radius:10px;font-weight:800;border:0}.recent-row-v3:last-child{border-bottom:0}.paid-dot-v3{display:inline-block;background:#e6f8ee;color:#127547;padding:4px 8px;border-radius:999px;font-weight:800;font-size:10px}
 .footer-v3{margin-top:2px;background:#064c39;color:#fff;border-radius:18px 18px 0 0;padding:17px 14px;text-align:center}.footer-v3 strong{display:block;font-size:13px}.footer-v3 span{font-size:11px;opacity:.85}.footer-v3 b{display:block;margin-top:5px;font-size:12px}
@@ -263,7 +263,6 @@ footer{
     <div class="kpi-card-v3"><div class="kpi-icon-v3">💳</div><div class="kpi-label-v3">COLLECTED THIS MONTH</div><div class="kpi-value-v3" id="dBalance">Rs. 0</div><div class="kpi-note-v3">Current month collection</div></div>
   </div>
 
-  
 
   <div class="quick-v3"><h3>⚡ Quick Actions</h3><div class="quick-grid-v3">
     <button class="quick-btn-v3 q1" onclick="openMember()">＋ Add Member<br><small>New member</small></button>
@@ -291,7 +290,7 @@ footer{
 
 <section id="notices" class="page"><h2>Announcements</h2><div class="toolbar"><button class="btn" onclick="openNotice()">+ Announcement</button></div><div id="noticeRows"></div></section>
 
-<section id="reports" class="page"><h2>Reports</h2><div class="sub">Reports are generated from Firebase data and monthly report snapshots are saved to Firebase.</div><div class="tabs"><button class="sel" onclick="reportType('summary',this)">Summary</button><button onclick="reportType('monthly',this)">Monthly Paid / Not Paid</button><button onclick="reportType('fund',this)">All Fund</button><button onclick="reportType('accounts',this)">Accounts</button></div><div id="reportBox" class="card"></div><div class="toolbar"><button class="btn" onclick="safePrintReport('Bahadur Khail Welfare Report')">🖨️ Print / Save PDF</button><button class="btn light" onclick="backup()">💾 Backup</button><button class="btn light" onclick="document.getElementById('restore').click()">↩️ Restore</button><input id="restore" type="file" accept=".json" class="hidden" onchange="restore(this)"></div></section>
+<section id="reports" class="page"><h2>Reports</h2><div class="sub">Reports are generated from Firebase data and monthly report snapshots are saved to Firebase.</div><div class="tabs"><button class="sel" onclick="reportType('summary',this)">Summary</button><button onclick="reportType('monthly',this)">Monthly Paid / Not Paid</button><button onclick="reportType('fund',this)">All Fund</button><button onclick="reportType('accounts',this)">Accounts</button></div><div id="reportBox" class="card"></div><div class="toolbar"><button class="btn" onclick="printCurrentReport()">🖨️ Print / Save PDF</button><button class="btn light" onclick="backup()">💾 Backup</button><button class="btn light" onclick="document.getElementById('restore').click()">↩️ Restore</button><input id="restore" type="file" accept=".json" class="hidden" onchange="restore(this)"></div></section>
 
 <section id="settings" class="page"><h2>Settings</h2><div class="card"><h3>Organization</h3><div class="formgrid"><div class="field"><label>Name</label><input id="orgName" value="Bahadur Khail Welfare Community"></div><div class="field"><label>Tagline</label><input id="tagline" value="امید • یکجہتی • خدمت"></div></div><button class="btn" onclick="saveSettings()">Save Settings</button></div>
 <div class="card" style="margin-top:12px"><h3>Security</h3><p class="sub">Change the local admin PIN.</p><div class="field"><label>New PIN</label><input id="newPin" type="password" inputmode="numeric"></div><button class="btn" onclick="changePin()">Change PIN</button></div>
@@ -447,8 +446,22 @@ document.getElementById('pin')?.addEventListener('keydown',function(e){if(e.key=
 
 function logout(){document.getElementById('app').classList.add('hidden');document.getElementById('login').classList.remove('hidden');document.getElementById('pin').value=''}
 function go(id){
-  setTimeout(repairPageView,60);
-document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.p===id));renderAll()}
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  const page=document.getElementById(id);
+  if(page)page.classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.p===id));
+  try{window.scrollTo({top:0,left:0,behavior:'instant'});}catch(e){window.scrollTo(0,0);}
+  requestAnimationFrame(function(){
+    try{
+      const p=document.getElementById(id);
+      if(p){p.style.visibility='visible';p.style.opacity='1';}
+    }catch(e){}
+  });
+  renderAll();
+  setTimeout(function(){
+    try{window.scrollTo(0,0);}catch(e){}
+  },80);
+}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.p));
 function modal(title,body){document.getElementById('mt').textContent=title;document.getElementById('mb').innerHTML=body;document.getElementById('modal').classList.add('show')}
 function closeModal(){document.getElementById('modal').classList.remove('show')}
@@ -574,7 +587,7 @@ function renderDashboard(){
   const dateEl=document.getElementById('date');if(dateEl)dateEl.textContent=new Date().toLocaleDateString('en-PK',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const recent=document.getElementById('dashRecentPayments');
   if(recent){const rows=db.fund.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')||Number(b.id)-Number(a.id)).slice(0,6);recent.innerHTML=rows.length?rows.map(x=>{const mm=db.members.find(q=>String(q.id)===String(x.memberId));return `<div class="recent-row-v3"><span>${esc(mm?.name||'Unknown')}</span><b>${money(x.paid)}</b><span>${esc(x.date||'—')}</span><span class="method"><span class="paid-dot-v3">Paid</span></span></div>`}).join(''):'<div class="empty">No payments yet.</div>';}
-  requestAnimationFrame(()=>{try{drawDashPaid();drawDashTrend();}catch(err){console.error(err);}});
+  requestAnimationFrame(()=>{try{window.scrollTo(0,0);}catch(err){}});
 }
 function sum(t){return db.tx.filter(x=>x.type===t).reduce((a,x)=>a+x.amount,0)}
 function renderMembers(){let q=(document.getElementById('ms')?.value||'').toLowerCase(),a=db.members.filter(x=>x.name.toLowerCase().includes(q));document.getElementById('memberRows').innerHTML=a.length?a.map(m=>`<tr><td><button class="name-link" onclick="openMemberHistory(${m.id})">${esc(m.name)}</button></td><td>${esc(m.phone)}</td><td>${money(m.fund)}</td><td><span class="pill ${m.status==='Active'?'ok':'pending'}">${m.status}</span></td><td><button class="btn light" onclick="openMemberHistory(${m.id})">History</button> <button class="btn light" onclick="openMember(${m.id})">Edit</button> <button class="btn red" onclick="delMember(${m.id})">Delete</button></td></tr>`).join(''):'<tr><td colspan="5" class="empty">No members.</td></tr>'}
@@ -919,68 +932,44 @@ function reportType(type,btn){
   }
   saveReportSnapshot(type,currentReportMonth||reportMonthValue()).catch(err=>{console.error('Report save failed:',err);toast('Report cloud save failed: '+(err.message||'Please check Firebase.'),'error');});
 }
-
-function safePrintReport(title){
-  try{
-    if(window.Capacitor && window.Capacitor.Plugins &&
-       window.Capacitor.Plugins.NativePrint){
-      window.Capacitor.Plugins.NativePrint.print({
-        jobName:title || 'Bahadur Khail Welfare Report'
-      });
-      return true;
-    }
-  }catch(e){console.error('Native print:',e);}
-  try{
-    window.print();
-    return true;
-  }catch(e){console.error('Browser print:',e);}
-  return false;
-}
-
 function printMonthlyReport(){
-  const monthValue=document.getElementById('reportMonth')?.value||reportMonthValue();
-  const m=monthlyReport(monthValue), label=monthLabel(monthValue);
-  const rowsPaid=m.paid.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td>${money(m.paidMap.get(String(x.id))||0)}</td><td>${esc(m.dateMap.get(String(x.id))||'—')}</td></tr>`).join('')||'<tr><td colspan="5">No paid members.</td></tr>';
-  const rowsNot=m.not.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td>Not Paid</td></tr>`).join('')||'<tr><td colspan="4">Everyone has paid.</td></tr>';
+  try{ renderMonthlyReport(); }catch(e){ console.error('Monthly report render:',e); }
 
-  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Monthly Fund Report - ${esc(label)}</title>
-  <style>body{font-family:Arial,sans-serif;padding:28px;color:#17344b}h1{font-size:22px;margin:0 0 5px}h2{font-size:18px;margin-top:26px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccd7df;padding:8px;text-align:left}th{background:#eef5fa}.summary{padding:12px;background:#f5f9fc;border:1px solid #dbe6ee;margin:15px 0}@media print{body{padding:0}}</style>
-  </head><body><h1>Bahadur Khail Welfare Community</h1><h2>Monthly Fund Report — ${esc(label)}</h2>
-  <div class="summary"><b>Report Month:</b> ${esc(label)} &nbsp; | &nbsp; <b>Total Members:</b> ${m.active.length} &nbsp; | &nbsp; <b>Paid:</b> ${m.paid.length} &nbsp; | &nbsp; <b>Not Paid:</b> ${m.not.length} &nbsp; | &nbsp; <b>Total Collected:</b> ${money(m.total)} &nbsp; | &nbsp; <b>Remaining:</b> ${money(Math.max(0,m.expected-m.total))}</div>
-  <h2>Paid Members (${m.paid.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Paid</th><th>Payment Date</th></tr></thead><tbody>${rowsPaid}</tbody></table>
-  <h2>Not Paid Members (${m.not.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Status</th></tr></thead><tbody>${rowsNot}</tbody></table></body></html>`;
+  setTimeout(function(){
+    try{
+      if(window.Capacitor &&
+         window.Capacitor.Plugins &&
+         window.Capacitor.Plugins.NativePrint){
+        window.Capacitor.Plugins.NativePrint.print({
+          jobName:'Bahadur Khail Welfare - Monthly Report'
+        });
+        return;
+      }
+    }catch(e){
+      console.error('Native monthly print:',e);
+    }
 
-  const w=window.open('','_blank');
-  if(w){
-    w.document.open(); w.document.write(html); w.document.close();
-    setTimeout(()=>{try{w.focus();w.print();}catch(e){console.error('Popup print:',e);}},350);
-    return;
-  }
-
-  // Android WebView fallback: temporarily render the report in the current page.
-  const root=document.getElementById('monthlyReportBody');
-  if(!root)return alert('Unable to open the print view.');
-  const oldHtml=root.innerHTML, oldClass=root.className;
-  root.className='print-fallback';
-  const cleanHtml=html
-    .replace(/<html>/gi,'')
-    .replace(/<\/html>/gi,'')
-    .replace(/<head>[\s\S]*?<\/head>/gi,'')
-    .replace(/<body>/gi,'')
-    .replace(/<\/body>/gi,'');
-  root.innerHTML=cleanHtml;
-  document.body.classList.add('print-mode');
-  setTimeout(()=>{
-    try{window.print();}catch(e){alert('Print is not available in this Android WebView.');}
-    setTimeout(()=>{root.innerHTML=oldHtml;root.className=oldClass;document.body.classList.remove('print-mode');},500);
-  },150);
+    /* Browser fallback only — no popup window, so Android Back cannot quit the app. */
+    try{
+      document.body.classList.add('print-mode');
+      window.print();
+      setTimeout(function(){
+        document.body.classList.remove('print-mode');
+      },800);
+    }catch(e){
+      document.body.classList.remove('print-mode');
+      alert('Print is not available on this device.');
+    }
+  },300);
 }
-function backup(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Bahadur_Khail_Welfare_Backup.json';a.click()}
+function backup({let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Bahadur_Khail_Welfare_Backup.json';a.click()}
 function restore(inp){let f=inp.files[0];if(!f)return;let r=new FileReader();r.onload=async()=>{try{let x=JSON.parse(r.result);if(!x.members||!x.fund||!x.tx)throw 0;db={...defaultDB,...x,members:Array.isArray(x.members)?x.members:[],fund:Array.isArray(x.fund)?x.fund:[],tx:Array.isArray(x.tx)?x.tx:[],notices:Array.isArray(x.notices)?x.notices:[],reports:Array.isArray(x.reports)?x.reports:[],settings:x.settings||defaultDB.settings,pin:x.pin||defaultDB.pin};await save();alert('Backup restored and saved to Firebase.')}catch(err){console.error('Restore:',err);alert(err?.message||'Invalid backup file.')}};r.readAsText(f)}
 function saveSettings(){db.settings.name=document.getElementById('orgName').value;db.settings.tag=document.getElementById('tagline').value;document.querySelectorAll('.brand h1').forEach(x=>x.textContent=db.settings.name);document.querySelectorAll('.brand small').forEach(x=>x.textContent=db.settings.tag);save().then(()=>alert('Settings saved successfully to Firebase.')).catch(err=>alert('Settings cloud save failed: '+(err.message||'Please try again.')))}
 function changePin(){let p=document.getElementById('newPin').value;if(!/^[0-9]{4,8}$/.test(p))return alert('PIN must be 4–8 digits.');db.pin=p;save().then(()=>{document.getElementById('newPin').value='';alert('PIN changed and saved to Firebase.')}).catch(err=>alert('PIN cloud save failed: '+(err.message||'Please try again.')))}
 async function clearData(){if(!confirm('This will permanently remove all local records. Continue?'))return;const backupState=db;db={...defaultDB,pin:backupState.pin,settings:backupState.settings};try{await save();alert('All records cleared from Firebase.')}catch(err){db=backupState;localStorage.setItem(K,JSON.stringify(db));renderAll();alert('Cloud clear failed: '+(err.message||'Please try again.'))}}
 function renderAll(){
+  try{document.body.classList.remove('print-mode');}catch(e){}
+
   const keepType=currentReportType||'summary';
   const keepMonth=currentReportMonth||reportMonthValue();
   renderDashboard();renderMembers();renderFund();renderAccounts();renderNotices();
@@ -992,27 +981,3 @@ function renderAll(){
 renderAll();
 </script>
 </body></html>
-<script>
-
-function repairPageView(){
-  try{
-    window.scrollTo(0,0);
-    document.documentElement.scrollTop=0;
-    document.body.scrollTop=0;
-    document.body.classList.remove('print-mode');
-    const main=document.querySelector('main');
-    if(main){
-      main.style.visibility='visible';
-      main.style.opacity='1';
-      main.style.display='';
-    }
-    requestAnimationFrame(function(){
-      try{
-        const el=document.querySelector('.page.active, .view.active, main');
-        if(el) el.style.transform='translateZ(0)';
-      }catch(e){}
-    });
-  }catch(e){console.error('Page repair:',e);}
-}
-
-</script>
