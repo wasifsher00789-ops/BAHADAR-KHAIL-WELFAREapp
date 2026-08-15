@@ -209,7 +209,72 @@ footer{
 @media(max-width:760px){#monthlyReportCharts .report-charts{grid-template-columns:1fr!important}#monthlyReportCharts .chart-card:nth-child(3){grid-column:auto}#monthlyReportBody .report-print{padding:12px}}
 @media print{#reports>.tabs,#reports>.sub,#reportBox>.toolbar,#reportBox>.grid,#monthlyReportCharts,#monthlyReportBody .report-footer{display:none!important}#monthlyReportBody .report-print{border:0;box-shadow:none;padding:0}}\n.print-fallback{background:#fff!important;color:#17344b!important;padding:20px!important}.print-fallback table{width:100%;border-collapse:collapse}.print-fallback th,.print-fallback td{border:1px solid #ccd7df;padding:8px;text-align:left}.print-fallback th{background:#eef5fa}.print-mode .top,.print-mode nav,.print-mode .toolbar,.print-mode .tabs{display:none!important}.print-mode main{padding:0}.print-mode #monthlyReportBody{display:block!important}
 </style>
-<script src="firebase-app-compat.js"></script><script src="firebase-auth-compat.js"></script><script src="firebase-database-compat.js"></script><script src="html2pdf.bundle.min.js"></script></head>
+<script src="firebase-app-compat.js"></script><script src="firebase-auth-compat.js"></script><script src="firebase-database-compat.js"></script><script src="html2pdf.bundle.min.js"></script>
+<style id="bhwc-android-print-fix">
+@media print{
+  body.bhwc-print-mode{background:#fff!important}
+  body.bhwc-print-mode .top,
+  body.bhwc-print-mode nav,
+  body.bhwc-print-mode .toolbar,
+  body.bhwc-print-mode .tabs,
+  body.bhwc-print-mode #login,
+  body.bhwc-print-mode footer{display:none!important}
+
+  body.bhwc-print-mode #app{
+    display:block!important;
+    max-width:none!important;
+    min-height:0!important;
+  }
+
+  body.bhwc-print-mode main{padding:0!important}
+  body.bhwc-print-mode .page{display:none!important}
+  body.bhwc-print-mode #reports{display:block!important}
+
+  body.bhwc-print-mode #reportBox{
+    display:block!important;
+    border:0!important;
+    box-shadow:none!important;
+    padding:0!important;
+    background:#fff!important;
+  }
+
+  body.bhwc-print-mode #reportBox .toolbar,
+  body.bhwc-print-mode #reportBox button,
+  body.bhwc-print-mode #reportBox select,
+  body.bhwc-print-mode #reportBox input{
+    display:none!important;
+  }
+
+  body.bhwc-print-mode #monthlyReportCharts{
+    display:block!important;
+  }
+
+  body.bhwc-print-mode .report-charts{
+    display:none!important;
+  }
+
+  body.bhwc-print-mode #monthlyReportBody .report-print{
+    display:block!important;
+    border:0!important;
+    box-shadow:none!important;
+    padding:0!important;
+  }
+
+  body.bhwc-print-mode #monthlyReportBody .report-footer{
+    display:block!important;
+  }
+
+  body.bhwc-print-mode table{
+    page-break-inside:auto!important;
+  }
+
+  body.bhwc-print-mode tr{
+    page-break-inside:avoid!important;
+    page-break-after:auto!important;
+  }
+}
+</style>
+</head>
 <body>
 <div id="login" class="login"><div class="loginbox">
 <div class="logoMark">BH</div><h1>Bahadur Khail Welfare Community</h1><p>امید • یکجہتی • خدمت</p>
@@ -963,97 +1028,42 @@ function reportType(type,btn,skipCloud){
 }
 
 async function safePrintReport(title){
-  // Print/save exactly the report currently selected. Never open a popup/window
-  // because Android WebView can treat that as a new page and quit/back out.
+  // Android-safe print: do NOT use Filesystem storage or popup windows.
+  // The Android system print dialog can print or "Save as PDF".
   const box=document.getElementById('reportBox');
   if(!box){toast('Report is not ready to print.','error');return false;}
 
-  const selectedTitle=(title||'Bahadur Khail Welfare Report').replace(/[^a-z0-9_-]+/gi,'_');
-  const clone=box.cloneNode(true);
+  const app=document.getElementById('app');
+  const reports=document.getElementById('reports');
+  if(!app||!reports){toast('Report page is not ready.','error');return false;}
 
-  // Remove controls from the PDF but keep the actual report, including the
-  // monthly Paid/Not Paid tables and charts.
-  clone.querySelectorAll('.toolbar,.tabs,button,select,input').forEach(el=>el.remove());
-  clone.classList.add('print-fallback');
-  clone.style.background='#fff';
-  clone.style.color='#17344b';
-  clone.style.padding='18px';
+  const previousType=currentReportType||'summary';
+  const previousMonth=currentReportMonth||reportMonthValue();
 
-  const wrapper=document.createElement('div');
-  wrapper.style.position='fixed';
-  wrapper.style.left='-100000px';
-  wrapper.style.top='0';
-  wrapper.style.width='900px';
-  wrapper.style.background='#fff';
-  wrapper.appendChild(clone);
-  document.body.appendChild(wrapper);
+  // Make the currently selected report the only printable area.
+  document.body.classList.add('bhwc-print-mode');
+  app.classList.remove('hidden');
+  reports.classList.add('active');
 
-  try{
-    if(typeof html2pdf!=='function'){
-      throw new Error('PDF engine is missing from the app build.');
+  // Give the browser a moment to finish layout/canvas rendering.
+  setTimeout(()=>{
+    try{
+      window.print();
+    }catch(e){
+      console.error('System print:',e);
+      toast('Print could not be started.','error');
     }
+    setTimeout(()=>{
+      document.body.classList.remove('bhwc-print-mode');
+      repairPageView();
+      try{
+        currentReportType=previousType;
+        currentReportMonth=previousMonth;
+      }catch(e){}
+    },700);
+  },180);
 
-    const opt={
-      margin:0.35,
-      filename:selectedTitle+'.pdf',
-      image:{type:'jpeg',quality:0.96},
-      html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false},
-      jsPDF:{unit:'in',format:'a4',orientation:'portrait'}
-    };
-
-    const blob=await html2pdf().set(opt).from(clone).outputPdf('blob');
-    const base64=await new Promise((resolve,reject)=>{
-      const r=new FileReader();
-      r.onload=()=>resolve(String(r.result).split(',')[1]);
-      r.onerror=reject;
-      r.readAsDataURL(blob);
-    });
-
-    // Android: save the PDF to Documents, then open the native share/save sheet.
-    if(window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Filesystem){
-      const FS=window.Capacitor.Plugins.Filesystem;
-      const saved=await FS.writeFile({
-        path:selectedTitle+'.pdf',
-        data:base64,
-        directory:'DOCUMENTS',
-        recursive:true
-      });
-
-      if(window.Capacitor.Plugins.Share){
-        try{
-          await window.Capacitor.Plugins.Share.share({
-            title:selectedTitle+' PDF',
-            text:'PDF report',
-            url:saved.uri||undefined,
-            dialogTitle:'Save / Share PDF'
-          });
-        }catch(e){
-          console.warn('Native PDF share cancelled/failed:',e);
-        }
-      }
-      toast('PDF saved successfully.','success');
-      return true;
-    }
-
-    // Browser fallback: download directly. No popup, so Back will not quit the app.
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;
-    a.download=selectedTitle+'.pdf';
-    a.style.display='none';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),30000);
-    toast('PDF downloaded successfully.','success');
-    return true;
-  }catch(e){
-    console.error('PDF generation:',e);
-    toast('PDF could not be created: '+(e.message||'Please try again.'),'error');
-    return false;
-  }finally{
-    wrapper.remove();
-  }
+  return true;
 }
 
 function backup(){
@@ -1090,44 +1100,57 @@ function browserBackup(blob,name){
 function restore(inp){let f=inp.files[0];if(!f)return;let r=new FileReader();r.onload=async()=>{try{let x=JSON.parse(r.result);if(!x.members||!x.fund||!x.tx)throw 0;db={...defaultDB,...x,members:Array.isArray(x.members)?x.members:[],fund:Array.isArray(x.fund)?x.fund:[],tx:Array.isArray(x.tx)?x.tx:[],notices:Array.isArray(x.notices)?x.notices:[],reports:Array.isArray(x.reports)?x.reports:[],settings:x.settings||defaultDB.settings,pin:x.pin||defaultDB.pin};await save();alert('Backup restored and saved to Firebase.')}catch(err){console.error('Restore:',err);alert(err?.message||'Invalid backup file.')}};r.readAsText(f)}
 function saveSettings(){db.settings.name=document.getElementById('orgName').value;db.settings.tag=document.getElementById('tagline').value;document.querySelectorAll('.brand h1').forEach(x=>x.textContent=db.settings.name);document.querySelectorAll('.brand small').forEach(x=>x.textContent=db.settings.tag);save().then(()=>alert('Settings saved successfully to Firebase.')).catch(err=>alert('Settings cloud save failed: '+(err.message||'Please try again.')))}
 function changePin(){let p=document.getElementById('newPin').value;if(!/^[0-9]{4,8}$/.test(p))return alert('PIN must be 4–8 digits.');db.pin=p;save().then(()=>{document.getElementById('newPin').value='';alert('PIN changed and saved to Firebase.')}).catch(err=>alert('PIN cloud save failed: '+(err.message||'Please try again.')))}
-async function clearData(){
-  if(!confirm('This will permanently remove all local records and Firebase records. Continue?'))return;
+async async function clearData(){
+  if(!confirm('This will permanently delete all members, funds, transactions, notices and reports from Firebase. Continue?')) return;
+
   const old=bhwcClone(db);
+
   try{
     await firebaseReadyWithTimeout(12000);
     if(!window.BHWC||!window.BHWC.root) throw new Error('Firebase is not initialized.');
 
     window.BHWC.syncing=true;
-    try{
-      // Delete ONLY the record collections. Keep PIN and organization settings.
-      // Using null in one atomic update removes the children on Firebase and
-      // makes the deletion visible to the Website realtime listener as well.
-      await window.BHWC.root.update({
-        members:null,
-        fund:null,
-        tx:null,
-        notices:null,
-        reports:null
-      });
-    }finally{
-      window.BHWC.syncing=false;
+
+    // Delete each data collection directly on Firebase.
+    // Settings and PIN are intentionally preserved.
+    const paths=['members','fund','tx','notices','reports','monthlyReports'];
+
+    for(const path of paths){
+      await window.BHWC.root.child(path).remove();
     }
 
-    db={...defaultDB,
-      members:[],fund:[],tx:[],notices:[],reports:[],
-      settings:old.settings||{},pin:old.pin||'1234'
+    // Clear local state only after Firebase confirms every deletion.
+    db={
+      ...defaultDB,
+      members:[],
+      fund:[],
+      tx:[],
+      notices:[],
+      reports:[],
+      settings:old.settings||defaultDB.settings,
+      pin:old.pin||defaultDB.pin
     };
-    window.BHWC.lastRemote=bhwcClone(db);
+
     localStorage.setItem(K,JSON.stringify(db));
+    window.BHWC.lastRemote=bhwcClone(db);
+
     renderAll();
-    alert('All records deleted from Firebase and the app.');
+    toast('All data deleted from Firebase successfully.','success');
+
   }catch(err){
+    console.error('Clear all Firebase:',err);
+
+    // Never pretend deletion succeeded.
     db=old;
     localStorage.setItem(K,JSON.stringify(db));
     renderAll();
-    alert('Delete failed: '+(err.message||'Please try again.'));
+
+    toast('Firebase deletion failed: '+(err.message||'Check Firebase Rules / connection.'),'error');
+  }finally{
+    window.BHWC.syncing=false;
   }
 }
+
 function renderAll(){
   const keepType=currentReportType||'summary';
   const keepMonth=currentReportMonth||reportMonthValue();
