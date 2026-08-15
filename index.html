@@ -963,36 +963,97 @@ function reportType(type,btn,skipCloud){
 }
 
 async function safePrintReport(title){
-  const report=document.getElementById('monthlyReportBody')||document.getElementById('reportBox');
-  if(!report){toast('Report is not ready to print.','error');return false;}
-  const name=(title||'Bahadur Khail Welfare Report').replace(/[^a-z0-9_-]+/gi,'_');
-  const clone=report.cloneNode(true);
+  // Print/save exactly the report currently selected. Never open a popup/window
+  // because Android WebView can treat that as a new page and quit/back out.
+  const box=document.getElementById('reportBox');
+  if(!box){toast('Report is not ready to print.','error');return false;}
+
+  const selectedTitle=(title||'Bahadur Khail Welfare Report').replace(/[^a-z0-9_-]+/gi,'_');
+  const clone=box.cloneNode(true);
+
+  // Remove controls from the PDF but keep the actual report, including the
+  // monthly Paid/Not Paid tables and charts.
+  clone.querySelectorAll('.toolbar,.tabs,button,select,input').forEach(el=>el.remove());
   clone.classList.add('print-fallback');
-  clone.style.background='#fff'; clone.style.color='#17344b'; clone.style.padding='18px';
+  clone.style.background='#fff';
+  clone.style.color='#17344b';
+  clone.style.padding='18px';
+
   const wrapper=document.createElement('div');
-  wrapper.style.position='fixed';wrapper.style.left='-100000px';wrapper.style.top='0';wrapper.style.width='900px';wrapper.style.background='#fff';
-  wrapper.appendChild(clone);document.body.appendChild(wrapper);
+  wrapper.style.position='fixed';
+  wrapper.style.left='-100000px';
+  wrapper.style.top='0';
+  wrapper.style.width='900px';
+  wrapper.style.background='#fff';
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
+
   try{
-    if(typeof html2pdf==='function'){
-      const opt={margin:0.35,filename:name+'.pdf',image:{type:'jpeg',quality:0.96},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'in',format:'a4',orientation:'portrait'}};
-      const blob=await html2pdf().set(opt).from(clone).outputPdf('blob');
-      if(window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Filesystem){
-        const base64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]);r.onerror=reject;r.readAsDataURL(blob)});
-        const FS=window.Capacitor.Plugins.Filesystem;
-        const saved=await FS.writeFile({path:name+'.pdf',data:base64,directory:'DOCUMENTS',recursive:true});
-        if(window.Capacitor.Plugins.Share){
-          try{await window.Capacitor.Plugins.Share.share({title:name+' PDF',text:name,url:saved.uri||undefined,dialogTitle:'Save / Share PDF'});return true;}catch(e){console.warn('Share failed:',e)}
-        }
-        toast('PDF saved in app Documents.','success');return true;
-      }
-      const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name+'.pdf';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);return true;
+    if(typeof html2pdf!=='function'){
+      throw new Error('PDF engine is missing from the app build.');
     }
-  }catch(e){console.error('PDF generation:',e)}
-  try{
-    const w=window.open('','_blank');
-    if(!w){toast('Print window blocked.','error');return false;}
-    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title||'Report')+'</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#17344b}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccd7df;padding:8px;text-align:left}th{background:#eef5fa}</style></head><body>'+clone.outerHTML+'</body></html>');w.document.close();setTimeout(()=>{try{w.print()}catch(e){}},300);return true;
-  }finally{wrapper.remove()}
+
+    const opt={
+      margin:0.35,
+      filename:selectedTitle+'.pdf',
+      image:{type:'jpeg',quality:0.96},
+      html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false},
+      jsPDF:{unit:'in',format:'a4',orientation:'portrait'}
+    };
+
+    const blob=await html2pdf().set(opt).from(clone).outputPdf('blob');
+    const base64=await new Promise((resolve,reject)=>{
+      const r=new FileReader();
+      r.onload=()=>resolve(String(r.result).split(',')[1]);
+      r.onerror=reject;
+      r.readAsDataURL(blob);
+    });
+
+    // Android: save the PDF to Documents, then open the native share/save sheet.
+    if(window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Filesystem){
+      const FS=window.Capacitor.Plugins.Filesystem;
+      const saved=await FS.writeFile({
+        path:selectedTitle+'.pdf',
+        data:base64,
+        directory:'DOCUMENTS',
+        recursive:true
+      });
+
+      if(window.Capacitor.Plugins.Share){
+        try{
+          await window.Capacitor.Plugins.Share.share({
+            title:selectedTitle+' PDF',
+            text:'PDF report',
+            url:saved.uri||undefined,
+            dialogTitle:'Save / Share PDF'
+          });
+        }catch(e){
+          console.warn('Native PDF share cancelled/failed:',e);
+        }
+      }
+      toast('PDF saved successfully.','success');
+      return true;
+    }
+
+    // Browser fallback: download directly. No popup, so Back will not quit the app.
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=selectedTitle+'.pdf';
+    a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+    toast('PDF downloaded successfully.','success');
+    return true;
+  }catch(e){
+    console.error('PDF generation:',e);
+    toast('PDF could not be created: '+(e.message||'Please try again.'),'error');
+    return false;
+  }finally{
+    wrapper.remove();
+  }
 }
 
 function backup(){
@@ -1029,7 +1090,44 @@ function browserBackup(blob,name){
 function restore(inp){let f=inp.files[0];if(!f)return;let r=new FileReader();r.onload=async()=>{try{let x=JSON.parse(r.result);if(!x.members||!x.fund||!x.tx)throw 0;db={...defaultDB,...x,members:Array.isArray(x.members)?x.members:[],fund:Array.isArray(x.fund)?x.fund:[],tx:Array.isArray(x.tx)?x.tx:[],notices:Array.isArray(x.notices)?x.notices:[],reports:Array.isArray(x.reports)?x.reports:[],settings:x.settings||defaultDB.settings,pin:x.pin||defaultDB.pin};await save();alert('Backup restored and saved to Firebase.')}catch(err){console.error('Restore:',err);alert(err?.message||'Invalid backup file.')}};r.readAsText(f)}
 function saveSettings(){db.settings.name=document.getElementById('orgName').value;db.settings.tag=document.getElementById('tagline').value;document.querySelectorAll('.brand h1').forEach(x=>x.textContent=db.settings.name);document.querySelectorAll('.brand small').forEach(x=>x.textContent=db.settings.tag);save().then(()=>alert('Settings saved successfully to Firebase.')).catch(err=>alert('Settings cloud save failed: '+(err.message||'Please try again.')))}
 function changePin(){let p=document.getElementById('newPin').value;if(!/^[0-9]{4,8}$/.test(p))return alert('PIN must be 4–8 digits.');db.pin=p;save().then(()=>{document.getElementById('newPin').value='';alert('PIN changed and saved to Firebase.')}).catch(err=>alert('PIN cloud save failed: '+(err.message||'Please try again.')))}
-async function clearData(){if(!confirm('This will permanently remove all local records. Continue?'))return;const old=bhwcClone(db);try{await firebaseReadyWithTimeout(12000);window.BHWC.syncing=true;try{await window.BHWC.root.set({members:[],fund:[],tx:[],notices:[],reports:[],settings:old.settings||{},pin:old.pin||'1234'})}finally{window.BHWC.syncing=false}db={...defaultDB,members:[],fund:[],tx:[],notices:[],reports:[],settings:old.settings||{},pin:old.pin||'1234'};window.BHWC.lastRemote=bhwcClone(db);localStorage.setItem(K,JSON.stringify(db));renderAll();alert('All records cleared from Firebase.')}catch(err){db=old;localStorage.setItem(K,JSON.stringify(db));renderAll();alert('Cloud clear failed: '+(err.message||'Please try again.'))}}
+async function clearData(){
+  if(!confirm('This will permanently remove all local records and Firebase records. Continue?'))return;
+  const old=bhwcClone(db);
+  try{
+    await firebaseReadyWithTimeout(12000);
+    if(!window.BHWC||!window.BHWC.root) throw new Error('Firebase is not initialized.');
+
+    window.BHWC.syncing=true;
+    try{
+      // Delete ONLY the record collections. Keep PIN and organization settings.
+      // Using null in one atomic update removes the children on Firebase and
+      // makes the deletion visible to the Website realtime listener as well.
+      await window.BHWC.root.update({
+        members:null,
+        fund:null,
+        tx:null,
+        notices:null,
+        reports:null
+      });
+    }finally{
+      window.BHWC.syncing=false;
+    }
+
+    db={...defaultDB,
+      members:[],fund:[],tx:[],notices:[],reports:[],
+      settings:old.settings||{},pin:old.pin||'1234'
+    };
+    window.BHWC.lastRemote=bhwcClone(db);
+    localStorage.setItem(K,JSON.stringify(db));
+    renderAll();
+    alert('All records deleted from Firebase and the app.');
+  }catch(err){
+    db=old;
+    localStorage.setItem(K,JSON.stringify(db));
+    renderAll();
+    alert('Delete failed: '+(err.message||'Please try again.'));
+  }
+}
 function renderAll(){
   const keepType=currentReportType||'summary';
   const keepMonth=currentReportMonth||reportMonthValue();
