@@ -440,17 +440,36 @@ function login(){
   const loginBox=document.getElementById('login');
   const app=document.getElementById('app');
   const entered=String(input?.value||'').trim();
-  const saved=String((db&&db.pin)||defaultDB.pin).trim();
-  if(entered===saved){
+
+  const finishLogin=function(){
+    const saved=String((db&&db.pin)||defaultDB.pin||'1234').trim();
+    if(entered===saved){
+      err?.classList.add('hidden');
+      loginBox?.classList.add('hidden');
+      app?.classList.remove('hidden');
+      try{renderAll();}catch(e){console.error('Dashboard render error:',e);}
+    }else{
+      err?.classList.remove('hidden');
+      input?.focus();
+      input?.select();
+    }
+  };
+
+  // Firebase data may still be loading when the user taps Login.
+  // Wait for it so the PIN stored in Firebase is not mistaken for a wrong PIN.
+  if(window.BHWC && window.BHWC.readyPromise && typeof window.BHWC.readyPromise.then==='function'){
     err?.classList.add('hidden');
-    loginBox?.classList.add('hidden');
-    app?.classList.remove('hidden');
-    try{renderAll();}catch(e){console.error('Dashboard render error:',e);}
-  }else{
-    err?.classList.remove('hidden');
-    input?.focus();
-    input?.select();
+    window.BHWC.readyPromise.then(function(){
+      finishLogin();
+    }).catch(function(e){
+      console.error('Firebase login sync:',e);
+      // Keep the existing local/default PIN usable even if Firebase is temporarily unavailable.
+      finishLogin();
+    });
+    return;
   }
+
+  finishLogin();
 }
 document.getElementById('pin')?.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();login();}});
 
