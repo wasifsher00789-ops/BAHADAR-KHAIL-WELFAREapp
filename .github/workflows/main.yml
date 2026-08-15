@@ -3,7 +3,8 @@ name: Build Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -11,11 +12,12 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -26,7 +28,7 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Create package
+      - name: Create package.json
         run: npm init -y
 
       - name: Install Capacitor
@@ -40,14 +42,11 @@ jobs:
           {
             "appId": "com.bahadurkhail.welfare",
             "appName": "Bahadur Khail Welfare",
-            "webDir": "www",
-            "server": {
-              "androidScheme": "https"
-            }
+            "webDir": "www"
           }
           EOF
 
-      - name: Prepare web files
+      - name: Prepare app HTML
         run: |
           set -e
           test -f index.html
@@ -55,21 +54,36 @@ jobs:
           mkdir -p www
           cp index.html www/index.html
 
-      - name: Download Firebase and PDF libraries locally
+      - name: Download Firebase SDK and PDF engine locally
         run: |
           set -e
-          curl -fL https://www.gstatic.com/firebasejs/12.7.0/firebase-app-compat.js -o www/firebase-app-compat.js
-          curl -fL https://www.gstatic.com/firebasejs/12.7.0/firebase-auth-compat.js -o www/firebase-auth-compat.js
-          curl -fL https://www.gstatic.com/firebasejs/12.7.0/firebase-database-compat.js -o www/firebase-database-compat.js
-          curl -fL https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js -o www/html2pdf.bundle.min.js
+          curl -fL --retry 3 --retry-delay 2 \
+            https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js \
+            -o www/firebase-app-compat.js
 
-      - name: Verify web dependencies
+          curl -fL --retry 3 --retry-delay 2 \
+            https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js \
+            -o www/firebase-auth-compat.js
+
+          curl -fL --retry 3 --retry-delay 2 \
+            https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js \
+            -o www/firebase-database-compat.js
+
+          curl -fL --retry 3 --retry-delay 2 \
+            https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js \
+            -o www/html2pdf.bundle.min.js
+
+          ls -lh www/
+
+      - name: Verify required web files
         run: |
           set -e
-          for f in index.html firebase-app-compat.js firebase-auth-compat.js firebase-database-compat.js html2pdf.bundle.min.js; do
-            test -s "www/$f"
-            echo "OK: www/$f"
-          done
+          test -s www/index.html
+          test -s www/firebase-app-compat.js
+          test -s www/firebase-auth-compat.js
+          test -s www/firebase-database-compat.js
+          test -s www/html2pdf.bundle.min.js
+          echo "All required web files are present."
 
       - name: Add Android
         run: npx cap add android
@@ -77,17 +91,17 @@ jobs:
       - name: Sync Android
         run: npx cap sync android
 
-      - name: Verify Android assets
+      - name: Verify packaged Android assets
         run: |
           set -e
-          test -s android/app/src/main/assets/public/index.html
-          test -s android/app/src/main/assets/public/firebase-app-compat.js
-          test -s android/app/src/main/assets/public/firebase-auth-compat.js
-          test -s android/app/src/main/assets/public/firebase-database-compat.js
-          test -s android/app/src/main/assets/public/html2pdf.bundle.min.js
-          echo "All Firebase/PDF assets are inside Android APK assets."
+          test -f android/app/src/main/assets/public/index.html
+          test -f android/app/src/main/assets/public/firebase-app-compat.js
+          test -f android/app/src/main/assets/public/firebase-auth-compat.js
+          test -f android/app/src/main/assets/public/firebase-database-compat.js
+          test -f android/app/src/main/assets/public/html2pdf.bundle.min.js
+          echo "Firebase and PDF assets are packaged in Android."
 
-      - name: Build APK
+      - name: Build Debug APK
         run: |
           cd android
           chmod +x gradlew
@@ -95,7 +109,8 @@ jobs:
 
       - name: Check APK
         run: |
-          test -s android/app/build/outputs/apk/debug/app-debug.apk
+          set -e
+          test -f android/app/build/outputs/apk/debug/app-debug.apk
           ls -lh android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
