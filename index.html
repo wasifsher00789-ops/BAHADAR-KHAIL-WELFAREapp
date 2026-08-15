@@ -406,7 +406,8 @@ async function save(){
   try{refreshActivePage()}catch(e){console.error('Render after save:',e)}
   await firebaseReadyWithTimeout(15000);
 
-  window.BHWC.saveQueue=(window.BHWC.saveQueue||Promise.resolve()).then(async function(){
+  const previousQueue = window.BHWC.saveQueue || Promise.resolve();
+  window.BHWC.saveQueue = Promise.resolve(previousQueue).catch(function(){ return true; }).then(async function(){
     const base=bhwcNorm(window.BHWC.lastRemote||{});
     const wanted=bhwcNorm(db);
     const jobs=[];
@@ -861,7 +862,8 @@ async function saveReportSnapshot(type, monthValue){
   if(!window.BHWC||!window.BHWC.root) throw new Error("Firebase is not initialized.");
   await firebaseReadyWithTimeout(12000);
 
-  window.BHWC.saveQueue=(window.BHWC.saveQueue||Promise.resolve()).then(async function(){
+  const previousReportQueue = window.BHWC.saveQueue || Promise.resolve();
+  window.BHWC.saveQueue = Promise.resolve(previousReportQueue).catch(function(){ return true; }).then(async function(){
     const payload={reports:Array.isArray(db.reports)?db.reports:[]};
     if(type==='monthly'){
       payload.monthlyReports={};
