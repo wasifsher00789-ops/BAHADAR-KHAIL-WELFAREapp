@@ -3,8 +3,7 @@ name: Build Android APK
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: read
@@ -12,12 +11,11 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -28,12 +26,12 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Create package.json
+      - name: Create package
         run: npm init -y
 
       - name: Install Capacitor
         run: |
-          npm install @capacitor/core@8 @capacitor/android@8
+          npm install @capacitor/core@8 @capacitor/android@8 @capacitor/filesystem@8 @capacitor/share@8
           npm install --save-dev @capacitor/cli@8
 
       - name: Create Capacitor config
@@ -42,106 +40,54 @@ jobs:
           {
             "appId": "com.bahadurkhail.welfare",
             "appName": "Bahadur Khail Welfare",
-            "webDir": "www"
+            "webDir": "www",
+            "server": {
+              "androidScheme": "https"
+            }
           }
           EOF
 
-      - name: Prepare website
+      - name: Prepare web files
         run: |
           set -e
-
           test -f index.html
-
           rm -rf www
           mkdir -p www
-
           cp index.html www/index.html
 
-          echo "index.html copied successfully"
-
-      - name: Download Firebase SDK locally
+      - name: Download Firebase and PDF libraries locally
         run: |
           set -e
+          curl -fL https://www.gstatic.com/firebasejs/12.7.0/firebase-app-compat.js -o www/firebase-app-compat.js
+          curl -fL https://www.gstatic.com/firebasejs/12.7.0/firebase-auth-compat.js -o www/firebase-auth-compat.js
+          curl -fL https://www.gstatic.com/firebasejs/12.7.0/firebase-database-compat.js -o www/firebase-database-compat.js
+          curl -fL https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js -o www/html2pdf.bundle.min.js
 
-          cd www
-
-          curl -fL \
-            https://www.gstatic.com/firebasejs/12.7.0/firebase-app-compat.js \
-            -o firebase-app-compat.js
-
-          curl -fL \
-            https://www.gstatic.com/firebasejs/12.7.0/firebase-auth-compat.js \
-            -o firebase-auth-compat.js
-
-          curl -fL \
-            https://www.gstatic.com/firebasejs/12.7.0/firebase-database-compat.js \
-            -o firebase-database-compat.js
-
-          echo "Firebase SDK files downloaded:"
-          ls -lh firebase-app-compat.js
-          ls -lh firebase-auth-compat.js
-          ls -lh firebase-database-compat.js
-
-      - name: Change Firebase CDN paths to local files
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-
-          p = Path("www/index.html")
-          s = p.read_text(encoding="utf-8")
-
-          s = s.replace(
-              "https://www.gstatic.com/firebasejs/12.7.0/firebase-app-compat.js",
-              "firebase-app-compat.js"
-          )
-
-          s = s.replace(
-              "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth-compat.js",
-              "firebase-auth-compat.js"
-          )
-
-          s = s.replace(
-              "https://www.gstatic.com/firebasejs/12.7.0/firebase-database-compat.js",
-              "firebase-database-compat.js"
-          )
-
-          p.write_text(s, encoding="utf-8")
-          PY
-
-      - name: Verify Firebase SDK
+      - name: Verify web dependencies
         run: |
           set -e
-
-          test -f www/firebase-app-compat.js
-          test -f www/firebase-auth-compat.js
-          test -f www/firebase-database-compat.js
-
-          grep -q 'firebase-app-compat.js' www/index.html
-          grep -q 'firebase-auth-compat.js' www/index.html
-          grep -q 'firebase-database-compat.js' www/index.html
-
-          echo "Firebase SDK verification PASSED"
+          for f in index.html firebase-app-compat.js firebase-auth-compat.js firebase-database-compat.js html2pdf.bundle.min.js; do
+            test -s "www/$f"
+            echo "OK: www/$f"
+          done
 
       - name: Add Android
-        run: |
-          npx cap add android
+        run: npx cap add android
 
       - name: Sync Android
-        run: |
-          npx cap sync android
+        run: npx cap sync android
 
-      - name: Verify Android web assets
+      - name: Verify Android assets
         run: |
           set -e
+          test -s android/app/src/main/assets/public/index.html
+          test -s android/app/src/main/assets/public/firebase-app-compat.js
+          test -s android/app/src/main/assets/public/firebase-auth-compat.js
+          test -s android/app/src/main/assets/public/firebase-database-compat.js
+          test -s android/app/src/main/assets/public/html2pdf.bundle.min.js
+          echo "All Firebase/PDF assets are inside Android APK assets."
 
-          test -f www/index.html
-          test -f www/firebase-app-compat.js
-          test -f www/firebase-auth-compat.js
-          test -f www/firebase-database-compat.js
-
-          echo "Android web assets are ready"
-
-      - name: Build Debug APK
+      - name: Build APK
         run: |
           cd android
           chmod +x gradlew
@@ -149,14 +95,8 @@ jobs:
 
       - name: Check APK
         run: |
-          set -e
-
-          APK="android/app/build/outputs/apk/debug/app-debug.apk"
-
-          test -f "$APK"
-
-          echo "APK successfully created:"
-          ls -lh "$APK"
+          test -s android/app/build/outputs/apk/debug/app-debug.apk
+          ls -lh android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
