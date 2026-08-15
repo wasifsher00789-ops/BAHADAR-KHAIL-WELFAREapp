@@ -323,7 +323,21 @@ function bhwcMerge(remote,local,base){
   local.forEach(x=>{const id=bhwcId(x);if(id&&rm.has(id)&&!used.has(id)){out.push(rm.get(id));used.add(id)}});
   return out;
 }
-function bhwcApply(v){const clean=bhwcNorm(v);window.BHWC.lastRemote=bhwcClone(clean);db=clean;localStorage.setItem(K,JSON.stringify(db));try{renderAll()}catch(e){console.error('Firebase render:',e)}}
+function bhwcApply(v){
+  const clean=bhwcNorm(v);
+  window.BHWC.lastRemote=bhwcClone(clean);
+  db=clean;
+  localStorage.setItem(K,JSON.stringify(db));
+  try{
+    const active=document.querySelector('.page.active')?.id||'home';
+    if(active==='home') renderDashboard();
+    else if(active==='members') renderMembers();
+    else if(active==='fund') renderFund();
+    else if(active==='accounts') renderAccounts();
+    else if(active==='notices') renderNotices();
+    else if(active==='reports') renderCurrentReport(true);
+  }catch(e){console.error('Firebase render:',e)}
+}
 try{
   const firebaseConfig={apiKey:'AIzaSyABjlhHEjHdNr6-xZfqlBFSjYXtLO0iE6U',authDomain:'bahadurkhail-welfare-community.firebaseapp.com',databaseURL:'https://bahadurkhail-welfare-community-default-rtdb.firebaseio.com',projectId:'bahadurkhail-welfare-community',storageBucket:'bahadurkhail-welfare-community.firebasestorage.app',messagingSenderId:'934004243813',appId:'1:934004243813:web:054dac138df7f933bf358c',measurementId:'G-R8XYW0DXKD'};
   if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
@@ -340,10 +354,24 @@ try{
 function toast(message,type){const old=document.querySelector('.bhwc-toast');if(old)old.remove();const el=document.createElement('div');el.className='bhwc-toast';el.textContent=message;el.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;padding:12px 18px;border-radius:12px;background:'+(type==='error'?'#b42318':'#0f7a5b')+';color:#fff;font:600 14px Arial,sans-serif;box-shadow:0 8px 25px rgba(0,0,0,.25);max-width:90%;text-align:center;';document.body.appendChild(el);setTimeout(()=>el.remove(),2800)}
 function firebaseReadyWithTimeout(ms){ms=Number(ms)||12000;if(window.BHWC&&window.BHWC.ready)return Promise.resolve(true);const p=(window.BHWC&&window.BHWC.readyPromise)||Promise.reject(new Error('Firebase is not initialized.'));return Promise.race([p.then(()=>{if(!window.BHWC.ready)throw new Error('Firebase is not connected yet.');return true}),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Firebase connection timed out.')),ms))])}
 function cloudPayload(){return{members:Array.isArray(db.members)?db.members:[],fund:Array.isArray(db.fund)?db.fund:[],tx:Array.isArray(db.tx)?db.tx:[],notices:Array.isArray(db.notices)?db.notices:[],reports:Array.isArray(db.reports)?db.reports:[],settings:db.settings||{},pin:db.pin||'1234'}}
+function refreshActivePage(){
+  const active=document.querySelector('.page.active')?.id||'home';
+  if(active==='home') renderDashboard();
+  else if(active==='members') renderMembers();
+  else if(active==='fund') renderFund();
+  else if(active==='accounts') renderAccounts();
+  else if(active==='notices') renderNotices();
+  else if(active==='reports') renderCurrentReport(true);
+}
+function renderCurrentReport(skipCloud){
+  const btn=document.querySelector('.tabs button.sel');
+  reportType(currentReportType||'summary',btn,!!skipCloud);
+}
+
 async function save(){
   // Always save locally first so the UI stays responsive.
   localStorage.setItem(K,JSON.stringify(db));
-  try{renderAll()}catch(e){console.error("Render after save:",e)}
+  try{refreshActivePage()}catch(e){console.error('Render after save:',e)}
 
   if(!window.BHWC||!window.BHWC.root){
     throw new Error("Firebase is not initialized.");
@@ -447,7 +475,7 @@ async function memberSave(e,id){
     }
     await save();
     closeModal();
-    renderAll();
+    refreshActivePage();
     toast('Member saved successfully.');
   }catch(err){
     form.dataset.saving='0';
@@ -494,7 +522,7 @@ async function fundSave(e){
     db.tx.push({id:id+1,date,type:'Income',title:'Monthly Fund - '+m.name,memberId,amount:amt});
     await save();
     closeModal();
-    renderAll();
+    refreshActivePage();
     toast('Fund saved successfully.');
   }catch(err){
     form.dataset.saving='0';
@@ -807,7 +835,7 @@ async function saveReportSnapshot(type, monthValue){
   await window.BHWC.saveQueue;
   return true;
 }
-function renderMonthlyReport(){
+function renderMonthlyReport(skipCloud){
   const input=document.getElementById('reportMonth');
   const body=document.getElementById('monthlyReportBody');
   if(!input||!body)return;
@@ -863,13 +891,13 @@ function renderMonthlyReport(){
   </div>`;
 
   // Save this exact monthly paid/not-paid snapshot to Firebase.
-  saveReportSnapshot('monthly',selected).catch(err=>{
+  if(!skipCloud) saveReportSnapshot('monthly',selected).catch(err=>{
     console.error('Monthly report save failed:',err);
     toast('Monthly report cloud save failed: '+(err.message||'Please check Firebase.'),'error');
   });
 }
 
-function reportType(type,btn){
+function reportType(type,btn,skipCloud){
   currentReportType=type;
   if(type==='monthly') currentReportMonth=document.getElementById('reportMonth')?.value||currentReportMonth||reportMonthValue();
   document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('sel'));
@@ -880,7 +908,7 @@ function reportType(type,btn){
     box.innerHTML=`<div class="toolbar" style="margin-top:0"><label style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px"><b>Report Month</b><select id="reportMonth" onchange="currentReportMonth=this.value;renderMonthlyReport()" style="padding:11px;border:1px solid var(--line);border-radius:12px;flex:1">${monthOptions(currentReportMonth||reportMonthValue())}</select></label><button class="btn" style="background:#0f7a5b" onclick="saveReportSnapshot('monthly',document.getElementById('reportMonth')?.value||reportMonthValue()).then(()=>toast('Monthly Paid / Not Paid report saved to Firebase.')).catch(e=>toast('Report save failed: '+(e.message||'Please check Firebase.'),'error'))">☁️ Save Report</button></div>
     <div class="grid" style="margin-top:10px"><div class="card metric"><div class="lab">Total Members</div><div class="val" id="rMemberCount">0</div></div><div class="card metric"><div class="lab">Paid</div><div class="val" id="rPaidCount">0</div></div><div class="card metric"><div class="lab">Not Paid</div><div class="val" id="rNotCount">0</div></div><div class="card metric"><div class="lab">Total Collected</div><div class="val" id="rTotalPaid">Rs. 0</div></div></div>
     <div id="monthlyReportCharts"></div><div id="monthlyReportBody" style="margin-top:14px"></div>`;
-    renderMonthlyReport();
+    renderMonthlyReport(!!skipCloud);
   } else if(type==='fund'){
     const rows=db.fund.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     box.innerHTML=`<h3>All Fund Payments</h3><div class="sub">Complete payment history across all months.</div><div class="tablewrap" style="margin-top:10px"><table class="table"><thead><tr><th>Date</th><th>Month</th><th>Member</th><th>Expected</th><th>Paid</th><th>Status</th></tr></thead><tbody>${rows.length?rows.map(x=>{const m=db.members.find(m=>Number(m.id)===Number(x.memberId));const ok=Number(x.paid)>=Number(x.expected);return `<tr><td>${esc(x.date||'')}</td><td>${esc(monthLabel(paymentMonthKey(x)))}</td><td>${esc(m?.name||'Unknown')}</td><td>${money(x.expected)}</td><td>${money(x.paid)}</td><td><span class="pill ${ok?'ok':'pending'}">${ok?'Paid':'Partial'}</span></td></tr>`}).join(''):'<tr><td colspan="6" class="empty">No fund payments.</td></tr>'}</tbody></table></div>`;
@@ -891,7 +919,7 @@ function reportType(type,btn){
     const paid=db.fund.reduce((a,x)=>a+Number(x.paid||0),0),i=sum('Income'),e=sum('Expense');
     box.innerHTML=`<h3>Overall Summary</h3><p>Total members: <b>${db.members.length}</b></p><p>Total fund collected: <b>${money(paid)}</b></p><p>Total income: <b>${money(i)}</b></p><p>Total expenses: <b>${money(e)}</b></p><h2>Balance: ${money(i-e)}</h2>`;
   }
-  saveReportSnapshot(type,currentReportMonth||reportMonthValue()).catch(err=>{console.error('Report save failed:',err);toast('Report cloud save failed: '+(err.message||'Please check Firebase.'),'error');});
+  if(!skipCloud) saveReportSnapshot(type,currentReportMonth||reportMonthValue()).catch(err=>{console.error('Report save failed:',err);toast('Report cloud save failed: '+(err.message||'Please check Firebase.'),'error');});
 }
 
 function safePrintReport(title){
