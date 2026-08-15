@@ -209,7 +209,7 @@ footer{
 @media(max-width:760px){#monthlyReportCharts .report-charts{grid-template-columns:1fr!important}#monthlyReportCharts .chart-card:nth-child(3){grid-column:auto}#monthlyReportBody .report-print{padding:12px}}
 @media print{#reports>.tabs,#reports>.sub,#reportBox>.toolbar,#reportBox>.grid,#monthlyReportCharts,#monthlyReportBody .report-footer{display:none!important}#monthlyReportBody .report-print{border:0;box-shadow:none;padding:0}}\n.print-fallback{background:#fff!important;color:#17344b!important;padding:20px!important}.print-fallback table{width:100%;border-collapse:collapse}.print-fallback th,.print-fallback td{border:1px solid #ccd7df;padding:8px;text-align:left}.print-fallback th{background:#eef5fa}.print-mode .top,.print-mode nav,.print-mode .toolbar,.print-mode .tabs{display:none!important}.print-mode main{padding:0}.print-mode #monthlyReportBody{display:block!important}
 </style>
-<script src="firebase-app-compat.js"></script><script src="firebase-auth-compat.js"></script><script src="firebase-database-compat.js"></script></head>
+<script src="firebase-app-compat.js"></script><script src="firebase-auth-compat.js"></script><script src="firebase-database-compat.js"></script><script src="html2pdf.bundle.min.js"></script></head>
 <body>
 <div id="login" class="login"><div class="loginbox">
 <div class="logoMark">BH</div><h1>Bahadur Khail Welfare Community</h1><p>امید • یکجہتی • خدمت</p>
@@ -339,7 +339,6 @@ function bhwcApply(v){
   }catch(e){console.error('Firebase render:',e)}
 }
 try{
-  if(typeof window.firebase==='undefined')throw new Error('Firebase SDK files are missing from the app build.');
   const firebaseConfig={apiKey:'AIzaSyABjlhHEjHdNr6-xZfqlBFSjYXtLO0iE6U',authDomain:'bahadurkhail-welfare-community.firebaseapp.com',databaseURL:'https://bahadurkhail-welfare-community-default-rtdb.firebaseio.com',projectId:'bahadurkhail-welfare-community',storageBucket:'bahadurkhail-welfare-community.firebasestorage.app',messagingSenderId:'934004243813',appId:'1:934004243813:web:054dac138df7f933bf358c',measurementId:'G-R8XYW0DXKD'};
   if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
   window.BHWC.auth=firebase.auth();window.BHWC.root=firebase.database().ref('appData');
@@ -347,9 +346,8 @@ try{
     window.BHWC.user=cred&&cred.user?cred.user:null;if(!window.BHWC.user)throw new Error('Firebase anonymous authentication failed.');return window.BHWC.root.once('value');
   }).then(function(snap){
     const remote=snap.val();
-    if(remote&&typeof remote==='object'){bhwcApply(remote)}else{const initial=bhwcNorm(db);return window.BHWC.root.set(initial).then(function(){bhwcApply(initial)})}
-    // IMPORTANT: keep Android and website connected after the first load.
-    window.BHWC.root.on('value',function(snap){if(window.BHWC.syncing)return;const v=snap.val();if(v&&typeof v==='object')bhwcApply(v)});
+    if(remote&&typeof remote==='object'){window.BHWC.lastRemote=bhwcClone(bhwcNorm(remote));bhwcApply(remote)}else{const initial=bhwcNorm(db);return window.BHWC.root.set(initial).then(function(){window.BHWC.lastRemote=bhwcClone(initial);bhwcApply(initial)})}
+    window.BHWC.root.on('value',function(snap){const v=snap.val();if(v&&typeof v==='object'){window.BHWC.lastRemote=bhwcClone(bhwcNorm(v));if(!window.BHWC.localWriteInFlight)bhwcApply(v)}});
   }).then(function(){window.BHWC.ready=true;return true}).catch(function(e){window.BHWC.ready=false;window.BHWC.lastError=e;console.error('Firebase init/sync failed:',e);throw e});
 }catch(e){window.BHWC.readyPromise=Promise.reject(e);console.error('Firebase init:',e)}
 function toast(message,type){const old=document.querySelector('.bhwc-toast');if(old)old.remove();const el=document.createElement('div');el.className='bhwc-toast';el.textContent=message;el.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;padding:12px 18px;border-radius:12px;background:'+(type==='error'?'#b42318':'#0f7a5b')+';color:#fff;font:600 14px Arial,sans-serif;box-shadow:0 8px 25px rgba(0,0,0,.25);max-width:90%;text-align:center;';document.body.appendChild(el);setTimeout(()=>el.remove(),2800)}
@@ -372,34 +370,30 @@ function renderCurrentReport(skipCloud){
 async function save(){
   localStorage.setItem(K,JSON.stringify(db));
   try{refreshActivePage()}catch(e){console.error('Render after save:',e)}
-  await firebaseReadyWithTimeout(12000);
-
-  const wanted=bhwcClone(db);
-  const base=bhwcClone(window.BHWC.lastRemote||bhwcNorm(null));
-  const patch={};
-
-  if(!bhwcEq(base.members,wanted.members))patch.members=wanted.members;
-  if(!bhwcEq(base.fund,wanted.fund))patch.fund=wanted.fund;
-  if(!bhwcEq(base.tx,wanted.tx))patch.tx=wanted.tx;
-  if(!bhwcEq(base.notices,wanted.notices))patch.notices=wanted.notices;
-  if(!bhwcEq(base.reports,wanted.reports))patch.reports=wanted.reports;
-  if(!bhwcEq(base.settings,wanted.settings))patch.settings=wanted.settings||{};
-  if(String(base.pin||'1234')!==String(wanted.pin||'1234'))patch.pin=String(wanted.pin||'1234');
-
-  if(!Object.keys(patch).length)return true;
-
-  window.BHWC.syncing=true;
-  try{
-    await window.BHWC.root.update(patch);
-    // update() resolves after the server acknowledges the write.
-    // Keep the exact state we just saved as the last known cloud snapshot.
-    window.BHWC.lastRemote=bhwcClone(wanted);
-    window.BHWC.lastError=null;
-    return true;
-  }finally{
-    window.BHWC.syncing=false;
-  }
+  await firebaseReadyWithTimeout(15000);
+  const wanted=bhwcNorm(db);
+  window.BHWC.saveQueue=(window.BHWC.saveQueue||Promise.resolve()).then(async function(){
+    const base=bhwcNorm(window.BHWC.lastRemote||null);
+    const patch={};
+    if(!bhwcEq(base.members,wanted.members))patch.members=wanted.members;
+    if(!bhwcEq(base.fund,wanted.fund))patch.fund=wanted.fund;
+    if(!bhwcEq(base.tx,wanted.tx))patch.tx=wanted.tx;
+    if(!bhwcEq(base.notices,wanted.notices))patch.notices=wanted.notices;
+    if(!bhwcEq(base.reports,wanted.reports))patch.reports=wanted.reports;
+    if(!bhwcEq(base.settings,wanted.settings))patch.settings=wanted.settings||{};
+    if(String(base.pin||'1234')!==String(wanted.pin||'1234'))patch.pin=String(wanted.pin||'1234');
+    if(!Object.keys(patch).length)return true;
+    window.BHWC.localWriteInFlight=true;
+    try{
+      await window.BHWC.root.update(patch);
+      window.BHWC.lastRemote=bhwcClone(bhwcNorm({...base,...patch}));
+      window.BHWC.lastError=null;
+      return true;
+    }finally{window.BHWC.localWriteInFlight=false;}
+  }).catch(function(e){window.BHWC.lastError=e;console.error('Firebase save failed:',e);throw e});
+  return window.BHWC.saveQueue;
 }
+
 function money(n){return 'Rs. '+Number(n||0).toLocaleString('en-PK')}
 function today(){return new Date().toISOString().slice(0,10)}
 function month(){return monthLabel(reportMonthValue())}
@@ -898,22 +892,39 @@ function reportType(type,btn,skipCloud){
   }
 }
 
-function safePrintReport(title){
+async function safePrintReport(title){
+  const report=document.getElementById('monthlyReportBody')||document.getElementById('reportBox');
+  if(!report){toast('Report is not ready to print.','error');return false;}
+  const name=(title||'Bahadur Khail Welfare Report').replace(/[^a-z0-9_-]+/gi,'_');
+  const clone=report.cloneNode(true);
+  clone.classList.add('print-fallback');
+  clone.style.background='#fff'; clone.style.color='#17344b'; clone.style.padding='18px';
+  const wrapper=document.createElement('div');
+  wrapper.style.position='fixed';wrapper.style.left='-100000px';wrapper.style.top='0';wrapper.style.width='900px';wrapper.style.background='#fff';
+  wrapper.appendChild(clone);document.body.appendChild(wrapper);
   try{
-    if(window.Capacitor && window.Capacitor.Plugins &&
-       window.Capacitor.Plugins.NativePrint){
-      window.Capacitor.Plugins.NativePrint.print({
-        jobName:title || 'Bahadur Khail Welfare Report'
-      });
-      return true;
+    if(typeof html2pdf==='function'){
+      const opt={margin:0.35,filename:name+'.pdf',image:{type:'jpeg',quality:0.96},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'in',format:'a4',orientation:'portrait'}};
+      const blob=await html2pdf().set(opt).from(clone).outputPdf('blob');
+      if(window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Filesystem){
+        const base64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]);r.onerror=reject;r.readAsDataURL(blob)});
+        const FS=window.Capacitor.Plugins.Filesystem;
+        const saved=await FS.writeFile({path:name+'.pdf',data:base64,directory:'DOCUMENTS',recursive:true});
+        if(window.Capacitor.Plugins.Share){
+          try{await window.Capacitor.Plugins.Share.share({title:name+' PDF',text:name,url:saved.uri||undefined,dialogTitle:'Save / Share PDF'});return true;}catch(e){console.warn('Share failed:',e)}
+        }
+        toast('PDF saved in app Documents.','success');return true;
+      }
+      const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name+'.pdf';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);return true;
     }
-  }catch(e){console.error('Native print:',e);}
+  }catch(e){console.error('PDF generation:',e)}
   try{
-    window.print();
-    return true;
-  }catch(e){console.error('Browser print:',e);}
-  return false;
+    const w=window.open('','_blank');
+    if(!w){toast('Print window blocked.','error');return false;}
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title||'Report')+'</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#17344b}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccd7df;padding:8px;text-align:left}th{background:#eef5fa}</style></head><body>'+clone.outerHTML+'</body></html>');w.document.close();setTimeout(()=>{try{w.print()}catch(e){}},300);return true;
+  }finally{wrapper.remove()}
 }
+
 function restore(inp){let f=inp.files[0];if(!f)return;let r=new FileReader();r.onload=async()=>{try{let x=JSON.parse(r.result);if(!x.members||!x.fund||!x.tx)throw 0;db={...defaultDB,...x,members:Array.isArray(x.members)?x.members:[],fund:Array.isArray(x.fund)?x.fund:[],tx:Array.isArray(x.tx)?x.tx:[],notices:Array.isArray(x.notices)?x.notices:[],reports:Array.isArray(x.reports)?x.reports:[],settings:x.settings||defaultDB.settings,pin:x.pin||defaultDB.pin};await save();alert('Backup restored and saved to Firebase.')}catch(err){console.error('Restore:',err);alert(err?.message||'Invalid backup file.')}};r.readAsText(f)}
 function saveSettings(){db.settings.name=document.getElementById('orgName').value;db.settings.tag=document.getElementById('tagline').value;document.querySelectorAll('.brand h1').forEach(x=>x.textContent=db.settings.name);document.querySelectorAll('.brand small').forEach(x=>x.textContent=db.settings.tag);save().then(()=>alert('Settings saved successfully to Firebase.')).catch(err=>alert('Settings cloud save failed: '+(err.message||'Please try again.')))}
 function changePin(){let p=document.getElementById('newPin').value;if(!/^[0-9]{4,8}$/.test(p))return alert('PIN must be 4–8 digits.');db.pin=p;save().then(()=>{document.getElementById('newPin').value='';alert('PIN changed and saved to Firebase.')}).catch(err=>alert('PIN cloud save failed: '+(err.message||'Please try again.')))}
