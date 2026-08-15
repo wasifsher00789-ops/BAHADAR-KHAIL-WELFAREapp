@@ -1,159 +1,71 @@
 name: Build Android APK
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
-
-permissions:
-  contents: read
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 18
 
-      - name: Setup Java
-        uses: actions/setup-java@v5
+      - name: Set up Java JDK 17
+        uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: 21
+          distribution: 'zulu'
+          java-version: '17'
 
-      - name: Create package
-        run: npm init -y
+      - name: Install Capacitor CLI
+        run: npm install -g @capacitor/cli
 
-      - name: Install Capacitor and Firebase
+      - name: Prepare website and bundle Firebase SDK locally
         run: |
-          npm install @capacitor/core@8 @capacitor/android@8 firebase@12.16.0
-          npm install --save-dev @capacitor/cli@8
+          mkdir -p www
+          cp index.html www/index.html
+          curl -fL --retry 3 https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js -o www/firebase-app-compat.js
+          curl -fL --retry 3 https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js -o www/firebase-auth-compat.js
+          curl -fL --retry 3 https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js -o www/firebase-database-compat.js
+          test -s www/firebase-app-compat.js
+          test -s www/firebase-auth-compat.js
+          test -s www/firebase-database-compat.js
 
       - name: Create Capacitor config
         run: |
-          cat > capacitor.config.json <<'EOF'
+          cat << 'EOF' > capacitor.config.json
           {
             "appId": "com.bahadurkhail.welfare",
-            "appName": "Bahadur Khail Welfare",
-            "webDir": "www"
+            "appName": "Bahadurkhail Welfare Community",
+            "webDir": "www",
+            "bundledWebRuntime": false
           }
           EOF
 
-      - name: Prepare index.html
+      - name: Add Android Platform
         run: |
-          set -e
+          npm install @capacitor/core @capacitor/android
+          npx cap add android
 
-          test -f index.html
-
-          rm -rf www
-          mkdir -p www
-
-          cp index.html www/index.html
-
-          echo "index.html:"
-          ls -lh www/index.html
-
-      - name: Install Firebase compat SDK files
-        run: |
-          set -e
-
-          mkdir -p www/firebase
-
-          cp node_modules/firebase/compat/app/dist/index.cjs.js \
-             www/firebase/firebase-app-compat.js
-
-          cp node_modules/firebase/compat/auth/dist/index.cjs.js \
-             www/firebase/firebase-auth-compat.js
-
-          cp node_modules/firebase/compat/database/dist/index.cjs.js \
-             www/firebase/firebase-database-compat.js
-
-          echo "Firebase files:"
-          ls -lh www/firebase/
-
-      - name: Patch Firebase scripts
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-          import re
-
-          p = Path("www/index.html")
-          s = p.read_text(encoding="utf-8")
-
-          # Remove old Firebase CDN script tags.
-          s = re.sub(
-              r'<script[^>]+firebase[^>]*></script>',
-              '',
-              s,
-              flags=re.I
-          )
-
-          firebase_scripts = """
-          <script src="firebase/firebase-app-compat.js"></script>
-          <script src="firebase/firebase-auth-compat.js"></script>
-          <script src="firebase/firebase-database-compat.js"></script>
-          """
-
-          if "</head>" in s:
-              s = s.replace("</head>", firebase_scripts + "\n</head>", 1)
-          else:
-              s = firebase_scripts + "\n" + s
-
-          p.write_text(s, encoding="utf-8")
-          PY
-
-          echo "Firebase references:"
-          grep -n "firebase.*compat" www/index.html || true
-
-      - name: Verify Firebase files
-        run: |
-          set -e
-
-          test -f www/firebase/firebase-app-compat.js
-          test -f www/firebase/firebase-auth-compat.js
-          test -f www/firebase/firebase-database-compat.js
-
-          echo "Firebase SDK files are present."
-
-      - name: Add Android
-        run: npx cap add android
-
-      - name: Sync Android
+      - name: Sync Capacitor project
         run: npx cap sync android
 
-      - name: Verify Android assets
-        run: |
-          set -e
-
-          test -f www/index.html
-          test -f www/firebase/firebase-app-compat.js
-          test -f www/firebase/firebase-auth-compat.js
-          test -f www/firebase/firebase-database-compat.js
-
-          echo "Android web assets verified."
-
-      - name: Build APK
+      - name: Build Android Debug APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug
 
-      - name: Check APK
-        run: |
-          test -f android/app/build/outputs/apk/debug/app-debug.apk
-          ls -lh android/app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Bahadur-Khail-Welfare-APK
+          name: bhwc-app-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 7
