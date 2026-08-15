@@ -903,7 +903,7 @@ function reportType(type,btn){
   const box=document.getElementById('reportBox');
   if(!box)return;
   if(type==='monthly'){
-    box.innerHTML=`<div class="toolbar" style="margin-top:0"><label style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px"><b>Report Month</b><select id="reportMonth" onchange="currentReportMonth=this.value;renderMonthlyReport()" style="padding:11px;border:1px solid var(--line);border-radius:12px;flex:1">${monthOptions(currentReportMonth||reportMonthValue())}</select></label><button class="btn" style="background:#0f7a5b" onclick="saveReportSnapshot('monthly',document.getElementById('reportMonth')?.value||reportMonthValue()).then(()=>toast('Monthly Paid / Not Paid report saved to Firebase.')).catch(e=>toast('Report save failed: '+(e.message||'Please check Firebase.'),'error'))">☁️ Save Report</button><button class="btn" style="background:#0f7a5b" onclick="printMonthlyReport()">🖨️ Print Monthly Report</button></div>
+    box.innerHTML=`<div class="toolbar" style="margin-top:0"><label style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px"><b>Report Month</b><select id="reportMonth" onchange="currentReportMonth=this.value;renderMonthlyReport()" style="padding:11px;border:1px solid var(--line);border-radius:12px;flex:1">${monthOptions(currentReportMonth||reportMonthValue())}</select></label><button class="btn" style="background:#0f7a5b" onclick="saveReportSnapshot('monthly',document.getElementById('reportMonth')?.value||reportMonthValue()).then(()=>toast('Monthly Paid / Not Paid report saved to Firebase.')).catch(e=>toast('Report save failed: '+(e.message||'Please check Firebase.'),'error'))">☁️ Save Report</button></div>
     <div class="grid" style="margin-top:10px"><div class="card metric"><div class="lab">Total Members</div><div class="val" id="rMemberCount">0</div></div><div class="card metric"><div class="lab">Paid</div><div class="val" id="rPaidCount">0</div></div><div class="card metric"><div class="lab">Not Paid</div><div class="val" id="rNotCount">0</div></div><div class="card metric"><div class="lab">Total Collected</div><div class="val" id="rTotalPaid">Rs. 0</div></div></div>
     <div id="monthlyReportCharts"></div><div id="monthlyReportBody" style="margin-top:14px"></div>`;
     renderMonthlyReport();
@@ -939,111 +939,96 @@ function safePrintReport(title){
 
 function printMonthlyReport(){
   const monthValue=document.getElementById('reportMonth')?.value||reportMonthValue();
-  const m=monthlyReport(monthValue);
-  const label=monthLabel(monthValue);
-  const body=document.getElementById('monthlyReportBody');
-  if(!body)return;
+  const m=monthlyReport(monthValue), label=monthLabel(monthValue);
+  const rowsPaid=m.paid.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td>${money(m.paidMap.get(String(x.id))||0)}</td><td>${esc(m.dateMap.get(String(x.id))||'—')}</td></tr>`).join('')||'<tr><td colspan="5">No paid members.</td></tr>';
+  const rowsNot=m.not.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td>Not Paid</td></tr>`).join('')||'<tr><td colspan="4">Everyone has paid.</td></tr>';
 
-  const rowsPaid=m.paid.map((x,i)=>
-    `<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td>${money(m.paidMap.get(String(x.id))||0)}</td><td>${esc(m.dateMap.get(String(x.id))||'—')}</td></tr>`
-  ).join('')||'<tr><td colspan="5">No paid members.</td></tr>';
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Monthly Fund Report - ${esc(label)}</title>
+  <style>body{font-family:Arial,sans-serif;padding:28px;color:#17344b}h1{font-size:22px;margin:0 0 5px}h2{font-size:18px;margin-top:26px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccd7df;padding:8px;text-align:left}th{background:#eef5fa}.summary{padding:12px;background:#f5f9fc;border:1px solid #dbe6ee;margin:15px 0}@media print{body{padding:0}}</style>
+  </head><body><h1>Bahadur Khail Welfare Community</h1><h2>Monthly Fund Report — ${esc(label)}</h2>
+  <div class="summary"><b>Report Month:</b> ${esc(label)} &nbsp; | &nbsp; <b>Total Members:</b> ${m.active.length} &nbsp; | &nbsp; <b>Paid:</b> ${m.paid.length} &nbsp; | &nbsp; <b>Not Paid:</b> ${m.not.length} &nbsp; | &nbsp; <b>Total Collected:</b> ${money(m.total)} &nbsp; | &nbsp; <b>Remaining:</b> ${money(Math.max(0,m.expected-m.total))}</div>
+  <h2>Paid Members (${m.paid.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Paid</th><th>Payment Date</th></tr></thead><tbody>${rowsPaid}</tbody></table>
+  <h2>Not Paid Members (${m.not.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Status</th></tr></thead><tbody>${rowsNot}</tbody></table></body></html>`;
 
-  const rowsNot=m.not.map((x,i)=>
-    `<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td>Not Paid</td></tr>`
-  ).join('')||'<tr><td colspan="4">Everyone has paid.</td></tr>';
+  const w=window.open('','_blank');
+  if(w){
+    w.document.open(); w.document.write(html); w.document.close();
+    setTimeout(()=>{try{w.focus();w.print();}catch(e){console.error('Popup print:',e);}},350);
+    return;
+  }
 
-  const original=body.innerHTML;
-  const originalClass=body.className;
-
-  body.className='print-fallback';
-  body.innerHTML=`
-    <div style="font-family:Arial,sans-serif;background:#fff;color:#17344b;padding:18px">
-      <h1 style="margin:0 0 5px;font-size:22px">Bahadur Khail Welfare Community</h1>
-      <h2 style="margin:0 0 14px;font-size:18px">Monthly Fund Report — ${esc(label)}</h2>
-      <div style="padding:12px;border:1px solid #ccd7df;margin-bottom:16px">
-        <b>Month:</b> ${esc(label)} &nbsp; | &nbsp;
-        <b>Total Members:</b> ${m.active.length} &nbsp; | &nbsp;
-        <b>Paid:</b> ${m.paid.length} &nbsp; | &nbsp;
-        <b>Not Paid:</b> ${m.not.length} &nbsp; | &nbsp;
-        <b>Total Collected:</b> ${money(m.total)} &nbsp; | &nbsp;
-        <b>Remaining:</b> ${money(Math.max(0,m.expected-m.total))}
-      </div>
-      <h3>Paid Members (${m.paid.length})</h3>
-      <table style="width:100%;border-collapse:collapse">
-        <thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Paid</th><th>Payment Date</th></tr></thead>
-        <tbody>${rowsPaid}</tbody>
-      </table>
-      <h3 style="margin-top:22px">Not Paid Members (${m.not.length})</h3>
-      <table style="width:100%;border-collapse:collapse">
-        <thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Status</th></tr></thead>
-        <tbody>${rowsNot}</tbody>
-      </table>
-    </div>`;
-
+  // Android WebView fallback: temporarily render the report in the current page.
+  const root=document.getElementById('monthlyReportBody');
+  if(!root)return alert('Unable to open the print view.');
+  const oldHtml=root.innerHTML, oldClass=root.className;
+  root.className='print-fallback';
+  const cleanHtml=html
+    .replace(/<html>/gi,'')
+    .replace(/<\/html>/gi,'')
+    .replace(/<head>[\s\S]*?<\/head>/gi,'')
+    .replace(/<body>/gi,'')
+    .replace(/<\/body>/gi,'');
+  root.innerHTML=cleanHtml;
   document.body.classList.add('print-mode');
+  setTimeout(()=>{
+    try{window.print();}catch(e){alert('Print is not available in this Android WebView.');}
+    setTimeout(()=>{root.innerHTML=oldHtml;root.className=oldClass;document.body.classList.remove('print-mode');},500);
+  },150);
+}
+async function backup(){
+  const filename='Bahadur_Khail_Welfare_Backup.json';
+  const json=JSON.stringify(db,null,2);
+  const blob=new Blob([json],{type:'application/json'});
 
-  setTimeout(function(){
-    try{ window.print(); }
-    catch(e){ console.error('Monthly print:',e); }
+  // Cloud backup: do not alter the normal appData structure.
+  try{
+    if(window.BHWC && window.BHWC.root){
+      await window.BHWC.root.child('backups').child(String(Date.now())).set({
+        createdAt:Date.now(),
+        data:JSON.parse(json)
+      });
+    }
+  }catch(e){
+    console.error('Firebase backup failed:',e);
+  }
+
+  // Android/browser file sharing.
+  try{
+    if(navigator.share && typeof File !== 'undefined'){
+      const file=new File([blob],filename,{type:'application/json'});
+      if(!navigator.canShare || navigator.canShare({files:[file]})){
+        await navigator.share({
+          title:'Bahadur Khail Welfare Backup',
+          text:'Backup file',
+          files:[file]
+        });
+        return;
+      }
+    }
+  }catch(e){
+    console.error('Share backup failed:',e);
+  }
+
+  // Download fallback.
+  try{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=filename;
+    a.setAttribute('download',filename);
+    a.style.position='fixed';
+    a.style.left='-9999px';
+    document.body.appendChild(a);
+    a.click();
 
     setTimeout(function(){
-      body.innerHTML=original;
-      body.className=originalClass;
-      document.body.classList.remove('print-mode');
-      try{renderMonthlyReport();}catch(e){}
-    },900);
-  },250);
-}
-function backup(){
-  const filename='Bahadur_Khail_Welfare_Backup.json';
-  const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
-
-  (async function(){
-    // Firebase backup
-    try{
-      if(window.BHWC&&window.BHWC.readyPromise) await window.BHWC.readyPromise;
-      if(window.BHWC&&window.BHWC.root){
-        await window.BHWC.root.child('backups').push({
-          createdAt:Date.now(),
-          createdAtISO:new Date().toISOString(),
-          data:JSON.parse(await blob.text())
-        });
-      }
-    }catch(e){console.error('Firebase backup:',e);}
-
-    // Android share/file
-    try{
-      if(navigator.share && typeof File!=='undefined'){
-        const file=new File([blob],filename,{type:'application/json'});
-        if(!navigator.canShare || navigator.canShare({files:[file]})){
-          await navigator.share({
-            title:'Bahadur Khail Welfare Backup',
-            text:'Bahadur Khail Welfare data backup',
-            files:[file]
-          });
-          return;
-        }
-      }
-    }catch(e){console.error('Backup share:',e);}
-
-    // Browser download fallback
-    try{
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a');
-      a.href=url;
-      a.download=filename;
-      a.style.display='none';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function(){
-        try{a.remove();}catch(e){}
-        try{URL.revokeObjectURL(url);}catch(e){}
-      },2000);
-    }catch(e){
-      console.error('Backup download:',e);
-      alert('Backup file save نہیں ہو سکی۔');
-    }
-  })();
+      try{a.remove();}catch(e){}
+      try{URL.revokeObjectURL(url);}catch(e){}
+    },2000);
+  }catch(e){
+    console.error('Backup download failed:',e);
+    alert('Backup save نہیں ہو سکی۔');
+  }
 }
 function restore(inp){let f=inp.files[0];if(!f)return;let r=new FileReader();r.onload=async()=>{try{let x=JSON.parse(r.result);if(!x.members||!x.fund||!x.tx)throw 0;db={...defaultDB,...x,members:Array.isArray(x.members)?x.members:[],fund:Array.isArray(x.fund)?x.fund:[],tx:Array.isArray(x.tx)?x.tx:[],notices:Array.isArray(x.notices)?x.notices:[],reports:Array.isArray(x.reports)?x.reports:[],settings:x.settings||defaultDB.settings,pin:x.pin||defaultDB.pin};await save();alert('Backup restored and saved to Firebase.')}catch(err){console.error('Restore:',err);alert(err?.message||'Invalid backup file.')}};r.readAsText(f)}
 function saveSettings(){db.settings.name=document.getElementById('orgName').value;db.settings.tag=document.getElementById('tagline').value;document.querySelectorAll('.brand h1').forEach(x=>x.textContent=db.settings.name);document.querySelectorAll('.brand small').forEach(x=>x.textContent=db.settings.tag);save().then(()=>alert('Settings saved successfully to Firebase.')).catch(err=>alert('Settings cloud save failed: '+(err.message||'Please try again.')))}
