@@ -17,10 +17,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Set up Java JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -45,8 +45,7 @@ jobs:
           {
             "appId": "com.bahadurkhail.welfare",
             "appName": "Bahadurkhail Welfare Community",
-            "webDir": "www",
-            "bundledWebRuntime": false
+            "webDir": "www"
           }
           EOF
 
@@ -62,7 +61,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
