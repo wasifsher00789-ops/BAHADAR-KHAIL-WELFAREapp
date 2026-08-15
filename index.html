@@ -209,7 +209,18 @@ footer{
 @media(max-width:760px){#monthlyReportCharts .report-charts{grid-template-columns:1fr!important}#monthlyReportCharts .chart-card:nth-child(3){grid-column:auto}#monthlyReportBody .report-print{padding:12px}}
 @media print{#reports>.tabs,#reports>.sub,#reportBox>.toolbar,#reportBox>.grid,#monthlyReportCharts,#monthlyReportBody .report-footer{display:none!important}#monthlyReportBody .report-print{border:0;box-shadow:none;padding:0}}\n.print-fallback{background:#fff!important;color:#17344b!important;padding:20px!important}.print-fallback table{width:100%;border-collapse:collapse}.print-fallback th,.print-fallback td{border:1px solid #ccd7df;padding:8px;text-align:left}.print-fallback th{background:#eef5fa}.print-mode .top,.print-mode nav,.print-mode .toolbar,.print-mode .tabs{display:none!important}.print-mode main{padding:0}.print-mode #monthlyReportBody{display:block!important}
 </style>
-<script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-database-compat.js"></script></head>
+<script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-database-compat.js"></script>
+<style id="android-webview-fix">
+html,body{min-height:100%;width:100%;overflow-x:hidden}
+body{min-height:100vh;-webkit-overflow-scrolling:touch}
+#app{min-height:100vh;width:100%}
+main{min-height:calc(100vh - 80px)}
+.page{width:100%;min-height:1px}
+.page.active{display:block!important}
+.tablewrap,.report-print,.report-charts{max-width:100%;overflow-x:auto}
+@media(max-width:600px){.top{position:relative}.hero-v3{margin-top:0}main{padding-top:10px}}
+</style>
+</head>
 <body>
 <div id="login" class="login"><div class="loginbox">
 <div class="logoMark">BH</div><h1>Bahadur Khail Welfare Community</h1><p>امید • یکجہتی • خدمت</p>
@@ -261,9 +272,6 @@ footer{
     <div class="kpi-card-v3"><div class="kpi-icon-v3">✅</div><div class="kpi-label-v3">PAID THIS MONTH</div><div class="kpi-value-v3" id="dFund">Rs. 0</div><div class="kpi-note-v3">Total payments received</div></div>
     <div class="kpi-card-v3"><div class="kpi-icon-v3">❌</div><div class="kpi-label-v3">NOT PAID</div><div class="kpi-value-v3" id="dPending">Rs. 0</div><div class="kpi-note-v3">Pending monthly fund</div></div>
     <div class="kpi-card-v3"><div class="kpi-icon-v3">💳</div><div class="kpi-label-v3">COLLECTED THIS MONTH</div><div class="kpi-value-v3" id="dBalance">Rs. 0</div><div class="kpi-note-v3">Current month collection</div></div>
-  </div>
-
-  <div class="chart-grid-v3"><canvas id="dashTrendChart" class="dash-canvas-v3" height="205"></canvas></div>
   </div>
 
   <div class="quick-v3"><h3>⚡ Quick Actions</h3><div class="quick-grid-v3">
@@ -447,7 +455,22 @@ function login(){
 document.getElementById('pin')?.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();login();}});
 
 function logout(){document.getElementById('app').classList.add('hidden');document.getElementById('login').classList.remove('hidden');document.getElementById('pin').value=''}
-function go(id){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.p===id));renderAll()}
+function go(id){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  const page=document.getElementById(id);
+  if(!page)return;
+  page.classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.p===id));
+  try{
+    if(id==='home')renderDashboard();
+    else if(id==='members')renderMembers();
+    else if(id==='fund')renderFund();
+    else if(id==='accounts')renderAccounts();
+    else if(id==='notices')renderNotices();
+    else if(id==='reports')reportType(currentReportType||'summary',document.querySelector('.tabs button[onclick*="'+(currentReportType||'summary')+'"]'));
+  }catch(e){console.error('Page render:',e)}
+  window.scrollTo({top:0,behavior:'auto'});
+}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.p));
 function modal(title,body){document.getElementById('mt').textContent=title;document.getElementById('mb').innerHTML=body;document.getElementById('modal').classList.add('show')}
 function closeModal(){document.getElementById('modal').classList.remove('show')}
@@ -573,7 +596,7 @@ function renderDashboard(){
   const dateEl=document.getElementById('date');if(dateEl)dateEl.textContent=new Date().toLocaleDateString('en-PK',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const recent=document.getElementById('dashRecentPayments');
   if(recent){const rows=db.fund.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')||Number(b.id)-Number(a.id)).slice(0,6);recent.innerHTML=rows.length?rows.map(x=>{const mm=db.members.find(q=>String(q.id)===String(x.memberId));return `<div class="recent-row-v3"><span>${esc(mm?.name||'Unknown')}</span><b>${money(x.paid)}</b><span>${esc(x.date||'—')}</span><span class="method"><span class="paid-dot-v3">Paid</span></span></div>`}).join(''):'<div class="empty">No payments yet.</div>';}
-  requestAnimationFrame(()=>{try{drawDashPaid();drawDashTrend();}catch(err){console.error(err);}});
+  requestAnimationFrame(()=>{try{}catch(err){console.error(err);}});
 }
 function sum(t){return db.tx.filter(x=>x.type===t).reduce((a,x)=>a+x.amount,0)}
 function renderMembers(){let q=(document.getElementById('ms')?.value||'').toLowerCase(),a=db.members.filter(x=>x.name.toLowerCase().includes(q));document.getElementById('memberRows').innerHTML=a.length?a.map(m=>`<tr><td><button class="name-link" onclick="openMemberHistory(${m.id})">${esc(m.name)}</button></td><td>${esc(m.phone)}</td><td>${money(m.fund)}</td><td><span class="pill ${m.status==='Active'?'ok':'pending'}">${m.status}</span></td><td><button class="btn light" onclick="openMemberHistory(${m.id})">History</button> <button class="btn light" onclick="openMember(${m.id})">Edit</button> <button class="btn red" onclick="delMember(${m.id})">Delete</button></td></tr>`).join(''):'<tr><td colspan="5" class="empty">No members.</td></tr>'}
@@ -920,36 +943,34 @@ function reportType(type,btn){
 }
 function printCurrentReport(){
   const type=(typeof currentReportType!=='undefined'&&currentReportType)||'summary';
-  const names={
-    summary:'Bahadur Khail Welfare - Summary Report',
-    fund:'Bahadur Khail Welfare - All Fund Report',
-    accounts:'Bahadur Khail Welfare - Accounts Report',
-    monthly:'Bahadur Khail Welfare - Monthly Report'
-  };
-  if(type==='monthly' && typeof printMonthlyReport==='function'){
-    return printMonthlyReport();
-  }
+  if(type==='monthly') return printMonthlyReport();
+  const names={summary:'Bahadur Khail Welfare - Summary Report',fund:'Bahadur Khail Welfare - All Fund Report',accounts:'Bahadur Khail Welfare - Accounts Report'};
+  document.body.classList.add('print-mode');
   try{
     if(window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.NativePrint){
-      return window.Capacitor.Plugins.NativePrint.print({jobName:names[type]||'Bahadur Khail Welfare Report'});
+      window.Capacitor.Plugins.NativePrint.print({jobName:names[type]||'Bahadur Khail Welfare Report'}).finally(()=>setTimeout(()=>document.body.classList.remove('print-mode'),1200));
+      return;
     }
-  }catch(e){console.error('Native print:',e);}
-  document.body.classList.add('print-mode');
-  setTimeout(()=>{ window.print(); setTimeout(()=>document.body.classList.remove('print-mode'),700); },100);
+  }catch(e){console.error('Native print:',e)}
+  setTimeout(()=>{try{window.print()}finally{setTimeout(()=>document.body.classList.remove('print-mode'),700)}},120);
 }
 
 function printMonthlyReport(){
-  try{
-    if(window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.NativePrint){
-      return window.Capacitor.Plugins.NativePrint.print({
-        jobName:'Bahadur Khail Welfare - Monthly Paid Not Paid Report'
-      });
-    }
-  }catch(e){console.error('Monthly native print:',e);}
+  renderMonthlyReport();
   document.body.classList.add('print-mode');
-  setTimeout(()=>{ window.print(); setTimeout(()=>document.body.classList.remove('print-mode'),700); },100);
+  setTimeout(()=>{
+    try{
+      if(window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.NativePrint){
+        window.Capacitor.Plugins.NativePrint.print({jobName:'Bahadur Khail Welfare - Monthly Paid Not Paid Report'}).finally(()=>setTimeout(()=>document.body.classList.remove('print-mode'),1200));
+        return;
+      }
+      window.print();
+    }catch(e){console.error('Monthly print:',e);try{window.print()}catch(_){}
+      setTimeout(()=>document.body.classList.remove('print-mode'),700);
+    }
+  },150);
 }
-function backup(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Bahadur_Khail_Welfare_Backup.json';a.click()}
+async function backup(){{let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Bahadur_Khail_Welfare_Backup.json';a.click()}
 function restore(inp){let f=inp.files[0];if(!f)return;let r=new FileReader();r.onload=async()=>{try{let x=JSON.parse(r.result);if(!x.members||!x.fund||!x.tx)throw 0;db={...defaultDB,...x,members:Array.isArray(x.members)?x.members:[],fund:Array.isArray(x.fund)?x.fund:[],tx:Array.isArray(x.tx)?x.tx:[],notices:Array.isArray(x.notices)?x.notices:[],reports:Array.isArray(x.reports)?x.reports:[],settings:x.settings||defaultDB.settings,pin:x.pin||defaultDB.pin};await save();alert('Backup restored and saved to Firebase.')}catch(err){console.error('Restore:',err);alert(err?.message||'Invalid backup file.')}};r.readAsText(f)}
 function saveSettings(){db.settings.name=document.getElementById('orgName').value;db.settings.tag=document.getElementById('tagline').value;document.querySelectorAll('.brand h1').forEach(x=>x.textContent=db.settings.name);document.querySelectorAll('.brand small').forEach(x=>x.textContent=db.settings.tag);save().then(()=>alert('Settings saved successfully to Firebase.')).catch(err=>alert('Settings cloud save failed: '+(err.message||'Please try again.')))}
 function changePin(){let p=document.getElementById('newPin').value;if(!/^[0-9]{4,8}$/.test(p))return alert('PIN must be 4–8 digits.');db.pin=p;save().then(()=>{document.getElementById('newPin').value='';alert('PIN changed and saved to Firebase.')}).catch(err=>alert('PIN cloud save failed: '+(err.message||'Please try again.')))}
