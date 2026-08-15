@@ -49,7 +49,7 @@ jobs:
       - name: Add Android
         run: npx cap add android
 
-      - name: Create Native Print Plugin
+      - name: Add native Print plugin
         run: |
           mkdir -p android/app/src/main/java/com/bahadurkhail/welfare
 
@@ -76,25 +76,26 @@ jobs:
                           android.webkit.WebView webView =
                               getBridge().getWebView();
 
-                          PrintManager manager =
-                              (PrintManager)getActivity()
-                              .getSystemService(Context.PRINT_SERVICE);
+                          PrintManager printManager =
+                              (PrintManager) getActivity()
+                                  .getSystemService(Context.PRINT_SERVICE);
 
-                          if (manager == null || webView == null) {
+                          if (printManager == null || webView == null) {
                               call.reject("Printing is not available");
                               return;
                           }
 
-                          String name = call.getString(
-                              "jobName",
-                              "Bahadur Khail Welfare Report"
-                          );
+                          String jobName =
+                              call.getString(
+                                  "jobName",
+                                  "Bahadur Khail Welfare Report"
+                              );
 
                           PrintDocumentAdapter adapter =
-                              webView.createPrintDocumentAdapter(name);
+                              webView.createPrintDocumentAdapter(jobName);
 
-                          manager.print(
-                              name,
+                          printManager.print(
+                              jobName,
                               adapter,
                               new PrintAttributes.Builder().build()
                           );
@@ -103,9 +104,9 @@ jobs:
 
                       } catch (Exception e) {
                           call.reject(
-                              e.getMessage() == null
-                              ? "Print failed"
-                              : e.getMessage()
+                              e.getMessage() != null
+                                  ? e.getMessage()
+                                  : "Print failed"
                           );
                       }
                   });
@@ -113,7 +114,7 @@ jobs:
           }
           EOF
 
-      - name: Register Native Print
+      - name: Register Print plugin
         run: |
           cat > android/app/src/main/java/com/bahadurkhail/welfare/MainActivity.java <<'EOF'
           package com.bahadurkhail.welfare;
@@ -131,7 +132,7 @@ jobs:
           }
           EOF
 
-      - name: Connect all report printing
+      - name: Connect Print button
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -139,92 +140,36 @@ jobs:
           p = Path("www/index.html")
           s = p.read_text(encoding="utf-8")
 
-          native = r'''
-          function androidNativePrint(title){
-            try{
-              if(
-                window.Capacitor &&
-                window.Capacitor.Plugins &&
-                window.Capacitor.Plugins.NativePrint
-              ){
-                window.Capacitor.Plugins.NativePrint.print({
-                  jobName:title || 'Bahadur Khail Welfare Report'
-                });
-                return true;
-              }
-            }catch(e){
-              console.error('Native print failed:',e);
+          old = "function printMonthlyReport(){"
+
+          new = """function printMonthlyReport(){
+          try{
+            if(window.Capacitor &&
+               window.Capacitor.Plugins &&
+               window.Capacitor.Plugins.NativePrint){
+
+              window.Capacitor.Plugins.NativePrint.print({
+                jobName:'Bahadur Khail Welfare Monthly Report'
+              });
+
+              return;
             }
-            return false;
+          }catch(e){
+            console.error('Native print failed:',e);
           }
-          '''
 
-          if "function androidNativePrint(" not in s:
-              pos = s.find("<script")
-              if pos >= 0:
-                  end = s.find(">", pos)
-                  s = s[:end+1] + native + s[end+1:]
+          """
 
-          # Monthly
-          s = s.replace(
-              "function printMonthlyReport(){",
-              """function printMonthlyReport(){
-          if(androidNativePrint('Bahadur Khail Welfare - Monthly Report')) return;
-          """,
-              1
-          )
+          if old in s and "NativePrint.print" not in s:
+              s = s.replace(old, new, 1)
 
-          # Report tabs: automatically add a native print button
-          # after report content is rendered.
-          hook = r'''
-          function addNativeReportPrintButton(){
-            try{
-              const box=document.getElementById('reportBox');
-              if(!box)return;
-
-              if(box.querySelector('.native-report-print'))return;
-
-              const btn=document.createElement('button');
-              btn.className='btn native-report-print';
-              btn.style.cssText='margin:10px 0;background:#1686c8;color:white';
-              btn.textContent='🖨️ Print This Report';
-
-              btn.onclick=function(){
-                const title =
-                  (typeof currentReportType!=='undefined' &&
-                   currentReportType)
-                  ? 'Bahadur Khail Welfare - '+currentReportType+' Report'
-                  : 'Bahadur Khail Welfare Report';
-
-                androidNativePrint(title);
-              };
-
-              box.insertBefore(btn,box.firstChild);
-            }catch(e){
-              console.error('Report print button:',e);
-            }
-          }
-          '''
-
-          if "function addNativeReportPrintButton(" not in s:
-              s += "\n<script>\n" + hook + "\n</script>\n"
-
-          # Call after report type changes.
-          marker = "saveReportSnapshot(type,currentReportMonth||reportMonthValue())"
-          if marker in s and "addNativeReportPrintButton();" not in s:
-              s = s.replace(
-                  marker,
-                  marker + ";\n  setTimeout(addNativeReportPrintButton,100);",
-                  1
-              )
-
-          p.write_text(s,encoding="utf-8")
+          p.write_text(s, encoding="utf-8")
           PY
 
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Build APK
+      - name: Build Debug APK
         run: |
           cd android
           chmod +x gradlew
