@@ -33,140 +33,29 @@ jobs:
 
       - name: Create Capacitor config
         run: |
-          cat > capacitor.config.json <<'EOF'
+          cat > capacitor.config.json <<'JSON'
           {
             "appId": "com.bahadurkhail.welfare",
             "appName": "Bahadur Khail Welfare",
             "webDir": "www"
           }
-          EOF
+          JSON
 
-      - name: Prepare website
+      - name: Prepare website and bundle Firebase SDK locally
         run: |
           mkdir -p www
-          cp index.html www/index.html
+          cp index_FIREBASE_APP_COMPATIBLE_FIXED.html www/index.html
+          curl -fL --retry 3 https://www.gstatic.com/firebasejs/12.7.0/firebase-app-compat.js -o www/firebase-app-compat.js
+          curl -fL --retry 3 https://www.gstatic.com/firebasejs/12.7.0/firebase-auth-compat.js -o www/firebase-auth-compat.js
+          curl -fL --retry 3 https://www.gstatic.com/firebasejs/12.7.0/firebase-database-compat.js -o www/firebase-database-compat.js
+          test -s www/firebase-app-compat.js
+          test -s www/firebase-auth-compat.js
+          test -s www/firebase-database-compat.js
 
       - name: Add Android
         run: npx cap add android
 
-      - name: Add native Print plugin
-        run: |
-          mkdir -p android/app/src/main/java/com/bahadurkhail/welfare
-
-          cat > android/app/src/main/java/com/bahadurkhail/welfare/NativePrintPlugin.java <<'EOF'
-          package com.bahadurkhail.welfare;
-
-          import android.content.Context;
-          import android.print.PrintAttributes;
-          import android.print.PrintDocumentAdapter;
-          import android.print.PrintManager;
-
-          import com.getcapacitor.Plugin;
-          import com.getcapacitor.PluginCall;
-          import com.getcapacitor.PluginMethod;
-          import com.getcapacitor.annotation.CapacitorPlugin;
-
-          @CapacitorPlugin(name = "NativePrint")
-          public class NativePrintPlugin extends Plugin {
-
-              @PluginMethod
-              public void print(PluginCall call) {
-                  getActivity().runOnUiThread(() -> {
-                      try {
-                          android.webkit.WebView webView =
-                              getBridge().getWebView();
-
-                          PrintManager printManager =
-                              (PrintManager) getActivity()
-                                  .getSystemService(Context.PRINT_SERVICE);
-
-                          if (printManager == null || webView == null) {
-                              call.reject("Printing is not available");
-                              return;
-                          }
-
-                          String jobName =
-                              call.getString(
-                                  "jobName",
-                                  "Bahadur Khail Welfare Report"
-                              );
-
-                          PrintDocumentAdapter adapter =
-                              webView.createPrintDocumentAdapter(jobName);
-
-                          printManager.print(
-                              jobName,
-                              adapter,
-                              new PrintAttributes.Builder().build()
-                          );
-
-                          call.resolve();
-
-                      } catch (Exception e) {
-                          call.reject(
-                              e.getMessage() != null
-                                  ? e.getMessage()
-                                  : "Print failed"
-                          );
-                      }
-                  });
-              }
-          }
-          EOF
-
-      - name: Register Print plugin
-        run: |
-          cat > android/app/src/main/java/com/bahadurkhail/welfare/MainActivity.java <<'EOF'
-          package com.bahadurkhail.welfare;
-
-          import android.os.Bundle;
-          import com.getcapacitor.BridgeActivity;
-
-          public class MainActivity extends BridgeActivity {
-
-              @Override
-              public void onCreate(Bundle savedInstanceState) {
-                  registerPlugin(NativePrintPlugin.class);
-                  super.onCreate(savedInstanceState);
-              }
-          }
-          EOF
-
-      - name: Connect Print button
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          p = Path("www/index.html")
-          s = p.read_text(encoding="utf-8")
-
-          old = "function printMonthlyReport(){"
-
-          new = """function printMonthlyReport(){
-          try{
-            if(window.Capacitor &&
-               window.Capacitor.Plugins &&
-               window.Capacitor.Plugins.NativePrint){
-
-              window.Capacitor.Plugins.NativePrint.print({
-                jobName:'Bahadur Khail Welfare Monthly Report'
-              });
-
-              return;
-            }
-          }catch(e){
-            console.error('Native print failed:',e);
-          }
-
-          """
-
-          if old in s and "NativePrint.print" not in s:
-              s = s.replace(old, new, 1)
-
-          p.write_text(s, encoding="utf-8")
-          PY
-
-      - name: Sync Capacitor
+      - name: Sync Android
         run: npx cap sync android
 
       - name: Build Debug APK
@@ -177,8 +66,8 @@ jobs:
 
       - name: Check APK
         run: |
+          ls -lh android/app/build/outputs/apk/debug/
           test -f android/app/build/outputs/apk/debug/app-debug.apk
-          ls -lh android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
