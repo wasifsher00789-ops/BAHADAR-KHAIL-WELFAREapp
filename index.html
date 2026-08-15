@@ -263,9 +263,7 @@ footer{
     <div class="kpi-card-v3"><div class="kpi-icon-v3">💳</div><div class="kpi-label-v3">COLLECTED THIS MONTH</div><div class="kpi-value-v3" id="dBalance">Rs. 0</div><div class="kpi-note-v3">Current month collection</div></div>
   </div>
 
-  <div class="chart-grid-v3">
-    <div class="chart-v3"><h3>Payment Overview</h3><div class="subv3">Paid vs Not Paid — current month</div><canvas id="dashPaidChart" class="dash-canvas-v3" height="205"></canvas></div>
-    <div class="chart-v3"><h3>Monthly Collection Trend</h3><div class="subv3">Last 6 months</div><canvas id="dashTrendChart" class="dash-canvas-v3" height="205"></canvas></div>
+  <div class="chart-grid-v3"><canvas id="dashTrendChart" class="dash-canvas-v3" height="205"></canvas></div>
   </div>
 
   <div class="quick-v3"><h3>⚡ Quick Actions</h3><div class="quick-grid-v3">
@@ -294,7 +292,7 @@ footer{
 
 <section id="notices" class="page"><h2>Announcements</h2><div class="toolbar"><button class="btn" onclick="openNotice()">+ Announcement</button></div><div id="noticeRows"></div></section>
 
-<section id="reports" class="page"><h2>Reports</h2><div class="sub">Reports are generated from Firebase data and monthly report snapshots are saved to Firebase.</div><div class="tabs"><button class="sel" onclick="reportType('summary',this)">Summary</button><button onclick="reportType('monthly',this)">Monthly Paid / Not Paid</button><button onclick="reportType('fund',this)">All Fund</button><button onclick="reportType('accounts',this)">Accounts</button></div><div id="reportBox" class="card"></div><div class="toolbar"><button class="btn" type="button" onclick="printReportNow('Bahadur Khail Welfare Report')">🖨️ Print / Save PDF</button><button class="btn light" onclick="backup()">💾 Backup</button><button class="btn light" onclick="document.getElementById('restore').click()">↩️ Restore</button><input id="restore" type="file" accept=".json" class="hidden" onchange="restore(this)"></div></section>
+<section id="reports" class="page"><h2>Reports</h2><div class="sub">Reports are generated from Firebase data and monthly report snapshots are saved to Firebase.</div><div class="tabs"><button class="sel" onclick="reportType('summary',this)">Summary</button><button onclick="reportType('monthly',this)">Monthly Paid / Not Paid</button><button onclick="reportType('fund',this)">All Fund</button><button onclick="reportType('accounts',this)">Accounts</button></div><div id="reportBox" class="card"></div><div class="toolbar"><button class="btn" onclick="printCurrentReport()">🖨️ Print / Save PDF</button><button class="btn light" onclick="backup()">💾 Backup</button><button class="btn light" onclick="document.getElementById('restore').click()">↩️ Restore</button><input id="restore" type="file" accept=".json" class="hidden" onchange="restore(this)"></div></section>
 
 <section id="settings" class="page"><h2>Settings</h2><div class="card"><h3>Organization</h3><div class="formgrid"><div class="field"><label>Name</label><input id="orgName" value="Bahadur Khail Welfare Community"></div><div class="field"><label>Tagline</label><input id="tagline" value="امید • یکجہتی • خدمت"></div></div><button class="btn" onclick="saveSettings()">Save Settings</button></div>
 <div class="card" style="margin-top:12px"><h3>Security</h3><p class="sub">Change the local admin PIN.</p><div class="field"><label>New PIN</label><input id="newPin" type="password" inputmode="numeric"></div><button class="btn" onclick="changePin()">Change PIN</button></div>
@@ -918,135 +916,40 @@ function reportType(type,btn){
     const paid=db.fund.reduce((a,x)=>a+Number(x.paid||0),0),i=sum('Income'),e=sum('Expense');
     box.innerHTML=`<h3>Overall Summary</h3><p>Total members: <b>${db.members.length}</b></p><p>Total fund collected: <b>${money(paid)}</b></p><p>Total income: <b>${money(i)}</b></p><p>Total expenses: <b>${money(e)}</b></p><h2>Balance: ${money(i-e)}</h2>`;
   }
-  setTimeout(()=>{
-    if(type==='summary') addReportPrintButton('Bahadur Khail Welfare - Summary Report');
-    else if(type==='fund') addReportPrintButton('Bahadur Khail Welfare - All Fund Report');
-    else if(type==='accounts') addReportPrintButton('Bahadur Khail Welfare - Accounts Report');
-  },50);
-
   saveReportSnapshot(type,currentReportMonth||reportMonthValue()).catch(err=>{console.error('Report save failed:',err);toast('Report cloud save failed: '+(err.message||'Please check Firebase.'),'error');});
 }
-
-function printReportNow(title){
+function printCurrentReport(){
+  const type=(typeof currentReportType!=='undefined'&&currentReportType)||'summary';
+  const names={
+    summary:'Bahadur Khail Welfare - Summary Report',
+    fund:'Bahadur Khail Welfare - All Fund Report',
+    accounts:'Bahadur Khail Welfare - Accounts Report',
+    monthly:'Bahadur Khail Welfare - Monthly Report'
+  };
+  if(type==='monthly' && typeof printMonthlyReport==='function'){
+    return printMonthlyReport();
+  }
   try{
-    if(window.Capacitor &&
-       window.Capacitor.Plugins &&
-       window.Capacitor.Plugins.NativePrint){
-      window.Capacitor.Plugins.NativePrint.print({
-        jobName:title||'Bahadur Khail Welfare Report'
-      });
-      return true;
+    if(window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.NativePrint){
+      return window.Capacitor.Plugins.NativePrint.print({jobName:names[type]||'Bahadur Khail Welfare Report'});
     }
-  }catch(e){
-    console.error('Native print:',e);
-  }
-  try{
-    window.print();
-    return true;
-  }catch(e){
-    console.error('Browser print:',e);
-    return false;
-  }
-}
-
-function addReportPrintButton(title){
-  const box=document.getElementById('reportBox');
-  if(!box)return;
-  const old=box.querySelector('.report-print-btn');
-  if(old)old.remove();
-
-  const wrap=document.createElement('div');
-  wrap.className='report-print-btn';
-  wrap.style.cssText='display:flex;justify-content:flex-end;gap:8px;margin:0 0 12px';
-
-  const btn=document.createElement('button');
-  btn.className='btn';
-  btn.type='button';
-  btn.textContent='🖨️ Print This Report';
-  btn.onclick=()=>printReportNow(title);
-
-  wrap.appendChild(btn);
-  box.prepend(wrap);
+  }catch(e){console.error('Native print:',e);}
+  document.body.classList.add('print-mode');
+  setTimeout(()=>{ window.print(); setTimeout(()=>document.body.classList.remove('print-mode'),700); },100);
 }
 
 function printMonthlyReport(){
-  const monthValue=document.getElementById('reportMonth')?.value||reportMonthValue();
-  const m=monthlyReport(monthValue), label=monthLabel(monthValue);
-  const rowsPaid=m.paid.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td>${money(m.paidMap.get(String(x.id))||0)}</td><td>${esc(m.dateMap.get(String(x.id))||'—')}</td></tr>`).join('')||'<tr><td colspan="5">No paid members.</td></tr>';
-  const rowsNot=m.not.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${money(x.fund)}</td><td>Not Paid</td></tr>`).join('')||'<tr><td colspan="4">Everyone has paid.</td></tr>';
-
-  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Monthly Fund Report - ${esc(label)}</title>
-  <style>body{font-family:Arial,sans-serif;padding:28px;color:#17344b}h1{font-size:22px;margin:0 0 5px}h2{font-size:18px;margin-top:26px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccd7df;padding:8px;text-align:left}th{background:#eef5fa}.summary{padding:12px;background:#f5f9fc;border:1px solid #dbe6ee;margin:15px 0}@media print{body{padding:0}}</style>
-  </head><body><h1>Bahadur Khail Welfare Community</h1><h2>Monthly Fund Report — ${esc(label)}</h2>
-  <div class="summary"><b>Report Month:</b> ${esc(label)} &nbsp; | &nbsp; <b>Total Members:</b> ${m.active.length} &nbsp; | &nbsp; <b>Paid:</b> ${m.paid.length} &nbsp; | &nbsp; <b>Not Paid:</b> ${m.not.length} &nbsp; | &nbsp; <b>Total Collected:</b> ${money(m.total)} &nbsp; | &nbsp; <b>Remaining:</b> ${money(Math.max(0,m.expected-m.total))}</div>
-  <h2>Paid Members (${m.paid.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Paid</th><th>Payment Date</th></tr></thead><tbody>${rowsPaid}</tbody></table>
-  <h2>Not Paid Members (${m.not.length})</h2><table><thead><tr><th>#</th><th>Member</th><th>Monthly Fund</th><th>Status</th></tr></thead><tbody>${rowsNot}</tbody></table></body></html>`;
-
-  const w=window.open('','_blank');
-  if(w){
-    w.document.open(); w.document.write(html); w.document.close();
-    setTimeout(()=>{try{w.focus();w.print();}catch(e){console.error('Popup print:',e);}},350);
-    return;
-  }
-
-  // Android WebView fallback: temporarily render the report in the current page.
-  const root=document.getElementById('monthlyReportBody');
-  if(!root)return alert('Unable to open the print view.');
-  const oldHtml=root.innerHTML, oldClass=root.className;
-  root.className='print-fallback';
-  const cleanHtml=html
-    .replace(/<html>/gi,'')
-    .replace(/<\/html>/gi,'')
-    .replace(/<head>[\s\S]*?<\/head>/gi,'')
-    .replace(/<body>/gi,'')
-    .replace(/<\/body>/gi,'');
-  root.innerHTML=cleanHtml;
-  document.body.classList.add('print-mode');
-  setTimeout(()=>{
-    try{window.print();}catch(e){alert('Print is not available in this Android WebView.');}
-    setTimeout(()=>{root.innerHTML=oldHtml;root.className=oldClass;document.body.classList.remove('print-mode');},500);
-  },150);
-}
-async function backup(){
-  const filename='Bahadur_Khail_Welfare_Backup.json';
-  const json=JSON.stringify(db,null,2);
-  const blob=new Blob([json],{type:'application/json'});
-
   try{
-    if(navigator.share && window.File){
-      const file=new File([blob],filename,{type:'application/json'});
-      if(!navigator.canShare || navigator.canShare({files:[file]})){
-        await navigator.share({
-          title:'Bahadur Khail Welfare Backup',
-          text:'Backup file',
-          files:[file]
-        });
-        return true;
-      }
+    if(window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.NativePrint){
+      return window.Capacitor.Plugins.NativePrint.print({
+        jobName:'Bahadur Khail Welfare - Monthly Paid Not Paid Report'
+      });
     }
-  }catch(e){
-    console.error('Share backup failed:',e);
-  }
-
-  try{
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;
-    a.download=filename;
-    a.rel='noopener';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(()=>{
-      a.remove();
-      URL.revokeObjectURL(url);
-    },1500);
-    return true;
-  }catch(e){
-    console.error('Backup download failed:',e);
-    alert('Backup could not be created on this device.');
-    return false;
-  }
+  }catch(e){console.error('Monthly native print:',e);}
+  document.body.classList.add('print-mode');
+  setTimeout(()=>{ window.print(); setTimeout(()=>document.body.classList.remove('print-mode'),700); },100);
 }
+function backup(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Bahadur_Khail_Welfare_Backup.json';a.click()}
 function restore(inp){let f=inp.files[0];if(!f)return;let r=new FileReader();r.onload=async()=>{try{let x=JSON.parse(r.result);if(!x.members||!x.fund||!x.tx)throw 0;db={...defaultDB,...x,members:Array.isArray(x.members)?x.members:[],fund:Array.isArray(x.fund)?x.fund:[],tx:Array.isArray(x.tx)?x.tx:[],notices:Array.isArray(x.notices)?x.notices:[],reports:Array.isArray(x.reports)?x.reports:[],settings:x.settings||defaultDB.settings,pin:x.pin||defaultDB.pin};await save();alert('Backup restored and saved to Firebase.')}catch(err){console.error('Restore:',err);alert(err?.message||'Invalid backup file.')}};r.readAsText(f)}
 function saveSettings(){db.settings.name=document.getElementById('orgName').value;db.settings.tag=document.getElementById('tagline').value;document.querySelectorAll('.brand h1').forEach(x=>x.textContent=db.settings.name);document.querySelectorAll('.brand small').forEach(x=>x.textContent=db.settings.tag);save().then(()=>alert('Settings saved successfully to Firebase.')).catch(err=>alert('Settings cloud save failed: '+(err.message||'Please try again.')))}
 function changePin(){let p=document.getElementById('newPin').value;if(!/^[0-9]{4,8}$/.test(p))return alert('PIN must be 4–8 digits.');db.pin=p;save().then(()=>{document.getElementById('newPin').value='';alert('PIN changed and saved to Firebase.')}).catch(err=>alert('PIN cloud save failed: '+(err.message||'Please try again.')))}
