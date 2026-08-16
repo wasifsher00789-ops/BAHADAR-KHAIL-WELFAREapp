@@ -50,18 +50,20 @@ jobs:
           set -e
           test -f index.html
           rm -rf www
-          mkdir -p www/firebase
+          mkdir -p www
           cp index.html www/index.html
 
       - name: Download Firebase compat SDK locally
         run: |
           set -e
-          curl -fL --retry 5 --retry-all-errors https://www.gstatic.com/firebasejs/12.16.0/firebase-app-compat.js -o www/firebase/firebase-app-compat.js
-          curl -fL --retry 5 --retry-all-errors https://www.gstatic.com/firebasejs/12.16.0/firebase-auth-compat.js -o www/firebase/firebase-auth-compat.js
-          curl -fL --retry 5 --retry-all-errors https://www.gstatic.com/firebasejs/12.16.0/firebase-database-compat.js -o www/firebase/firebase-database-compat.js
-          test -s www/firebase/firebase-app-compat.js
-          test -s www/firebase/firebase-auth-compat.js
-          test -s www/firebase/firebase-database-compat.js
+          curl -fL --retry 5 --retry-all-errors https://www.gstatic.com/firebasejs/12.16.0/firebase-app-compat.js -o www/firebase-app-compat.js
+          curl -fL --retry 5 --retry-all-errors https://www.gstatic.com/firebasejs/12.16.0/firebase-auth-compat.js -o www/firebase-auth-compat.js
+          curl -fL --retry 5 --retry-all-errors https://www.gstatic.com/firebasejs/12.16.0/firebase-database-compat.js -o www/firebase-database-compat.js
+          test -s www/firebase-app-compat.js
+          test -s www/firebase-auth-compat.js
+          test -s www/firebase-database-compat.js
+          curl -fL --retry 5 --retry-all-errors https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js -o www/html2pdf.bundle.min.js
+          test -s www/html2pdf.bundle.min.js
 
       - name: Add Android
         run: npx cap add android
@@ -73,9 +75,11 @@ jobs:
         run: |
           set -e
           test -s www/index.html
-          test -s www/firebase/firebase-app-compat.js
-          test -s www/firebase/firebase-auth-compat.js
-          test -s www/firebase/firebase-database-compat.js
+          test -s www/firebase-app-compat.js
+          test -s www/firebase-auth-compat.js
+          test -s www/firebase-database-compat.js
+          curl -fL --retry 5 --retry-all-errors https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js -o www/html2pdf.bundle.min.js
+          test -s www/html2pdf.bundle.min.js
           test -s android/app/src/main/assets/public/index.html
 
       - name: Build Debug APK
