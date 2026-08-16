@@ -1028,42 +1028,43 @@ function reportType(type,btn,skipCloud){
 }
 
 async function safePrintReport(title){
-  // Android-safe print: do NOT use Filesystem storage or popup windows.
-  // The Android system print dialog can print or "Save as PDF".
   const box=document.getElementById('reportBox');
   if(!box){toast('Report is not ready to print.','error');return false;}
 
-  const app=document.getElementById('app');
-  const reports=document.getElementById('reports');
-  if(!app||!reports){toast('Report page is not ready.','error');return false;}
+  const reportTypeName=currentReportType==='monthly'?'Monthly Paid Not Paid':
+    currentReportType==='fund'?'All Fund':
+    currentReportType==='accounts'?'Accounts':'Summary';
+  const jobName=(title||'Bahadur Khail Welfare Report')+' - '+reportTypeName;
 
-  const previousType=currentReportType||'summary';
-  const previousMonth=currentReportMonth||reportMonthValue();
-
-  // Make the currently selected report the only printable area.
-  document.body.classList.add('bhwc-print-mode');
-  app.classList.remove('hidden');
-  reports.classList.add('active');
-
-  // Give the browser a moment to finish layout/canvas rendering.
-  setTimeout(()=>{
-    try{
-      window.print();
-    }catch(e){
-      console.error('System print:',e);
-      toast('Print could not be started.','error');
+  try{
+    const Printer=window.Capacitor?.Plugins?.Printer;
+    if(Printer && typeof Printer.printHtml==='function'){
+      const styles=[...document.querySelectorAll('style')].map(s=>s.textContent||'').join('\\n');
+      const html='<!doctype html><html><head><meta charset="UTF-8">'+
+        '<style>'+styles+
+        '@page{size:A4;margin:12mm}html,body{background:#fff!important;color:#111!important}'+
+        'body{font-family:Arial,sans-serif;font-size:12px}.no-print,nav,.nav,.toolbar,.tabs,button{display:none!important}'+
+        '.page{display:block!important}.card{box-shadow:none!important}table{width:100%;border-collapse:collapse}'+
+        'th,td{border:1px solid #bbb;padding:6px}h1,h2,h3{color:#111!important}</style></head><body>'+
+        '<h2 style="text-align:center">'+esc(jobName)+'</h2>'+box.innerHTML+
+        '</body></html>';
+      await Printer.printHtml({name:jobName,html:html,orientation:'portrait'});
+      return true;
     }
-    setTimeout(()=>{
-      document.body.classList.remove('bhwc-print-mode');
-      repairPageView();
-      try{
-        currentReportType=previousType;
-        currentReportMonth=previousMonth;
-      }catch(e){}
-    },700);
-  },180);
+  }catch(e){
+    console.error('Native print:',e);
+  }
 
-  return true;
+  try{
+    document.body.classList.add('bhwc-print-mode');
+    window.print();
+    setTimeout(()=>document.body.classList.remove('bhwc-print-mode'),700);
+    return true;
+  }catch(e){
+    console.error('System print:',e);
+    toast('Print could not be started.','error');
+    return false;
+  }
 }
 
 function backup(){
@@ -1100,53 +1101,40 @@ function browserBackup(blob,name){
 function restore(inp){let f=inp.files[0];if(!f)return;let r=new FileReader();r.onload=async()=>{try{let x=JSON.parse(r.result);if(!x.members||!x.fund||!x.tx)throw 0;db={...defaultDB,...x,members:Array.isArray(x.members)?x.members:[],fund:Array.isArray(x.fund)?x.fund:[],tx:Array.isArray(x.tx)?x.tx:[],notices:Array.isArray(x.notices)?x.notices:[],reports:Array.isArray(x.reports)?x.reports:[],settings:x.settings||defaultDB.settings,pin:x.pin||defaultDB.pin};await save();alert('Backup restored and saved to Firebase.')}catch(err){console.error('Restore:',err);alert(err?.message||'Invalid backup file.')}};r.readAsText(f)}
 function saveSettings(){db.settings.name=document.getElementById('orgName').value;db.settings.tag=document.getElementById('tagline').value;document.querySelectorAll('.brand h1').forEach(x=>x.textContent=db.settings.name);document.querySelectorAll('.brand small').forEach(x=>x.textContent=db.settings.tag);save().then(()=>alert('Settings saved successfully to Firebase.')).catch(err=>alert('Settings cloud save failed: '+(err.message||'Please try again.')))}
 function changePin(){let p=document.getElementById('newPin').value;if(!/^[0-9]{4,8}$/.test(p))return alert('PIN must be 4–8 digits.');db.pin=p;save().then(()=>{document.getElementById('newPin').value='';alert('PIN changed and saved to Firebase.')}).catch(err=>alert('PIN cloud save failed: '+(err.message||'Please try again.')))}
-async async function clearData(){
+async function clearData(){
   if(!confirm('This will permanently delete all members, funds, transactions, notices and reports from Firebase. Continue?')) return;
-
   const old=bhwcClone(db);
-
   try{
-    await firebaseReadyWithTimeout(12000);
+    await firebaseReadyWithTimeout(15000);
     if(!window.BHWC||!window.BHWC.root) throw new Error('Firebase is not initialized.');
-
     window.BHWC.syncing=true;
-
-    // Delete each data collection directly on Firebase.
-    // Settings and PIN are intentionally preserved.
-    const paths=['members','fund','tx','notices','reports','monthlyReports'];
-
-    for(const path of paths){
-      await window.BHWC.root.child(path).remove();
-    }
-
-    // Clear local state only after Firebase confirms every deletion.
+    window.BHWC.localWriteInFlight=true;
+    await window.BHWC.root.update({
+      members:null,
+      fund:null,
+      tx:null,
+      notices:null,
+      reports:null,
+      monthlyReports:null
+    });
     db={
       ...defaultDB,
-      members:[],
-      fund:[],
-      tx:[],
-      notices:[],
-      reports:[],
+      members:[],fund:[],tx:[],notices:[],reports:[],
       settings:old.settings||defaultDB.settings,
       pin:old.pin||defaultDB.pin
     };
-
     localStorage.setItem(K,JSON.stringify(db));
     window.BHWC.lastRemote=bhwcClone(db);
-
     renderAll();
-    toast('All data deleted from Firebase successfully.','success');
-
+    toast('All data deleted from Firebase and app.','success');
   }catch(err){
     console.error('Clear all Firebase:',err);
-
-    // Never pretend deletion succeeded.
     db=old;
     localStorage.setItem(K,JSON.stringify(db));
     renderAll();
-
     toast('Firebase deletion failed: '+(err.message||'Check Firebase Rules / connection.'),'error');
   }finally{
+    window.BHWC.localWriteInFlight=false;
     window.BHWC.syncing=false;
   }
 }
